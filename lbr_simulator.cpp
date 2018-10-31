@@ -22,6 +22,7 @@ public:
 		}
 	}
 
+
 	void AddBranchEntry(VOID* src, VOID* dest) {
 		_tos_ptr = (_tos_ptr + 1) % _stack_size;
 		_src_msr_stack[_tos_ptr] = src;
@@ -32,12 +33,29 @@ public:
 		return _tos_ptr;
 	}
 
+	void PrintLBRStack() {
+		int stack_count = 0;
+		fprintf(stdout, "\nLBR Stack\n");
+		fprintf(stdout, "___________________\n");
+		for(int i = _tos_ptr; i >= 0; i--) {
+			fprintf(stdout, "[%d] Branch: %p | Target %p\n",
+					stack_count + 1,
+					_src_msr_stack[i],
+					_dst_msr_stack[i]);
+			stack_count += 1;
+		}
+		fprintf(stdout, "___________________\n");
+	}
+
 private:
 	size_t _stack_size;
 	VOID** _src_msr_stack;
 	VOID** _dst_msr_stack;
 	size_t _tos_ptr;
 };
+
+// TODO: create mapping for LBR per thread
+LBR* test_lbr = NULL;
 
 void PrintModules(IMG img, VOID* v) {
 	size_t image_cnt = 0;
@@ -65,11 +83,12 @@ void PrintModules(IMG img, VOID* v) {
 VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
 	fprintf(stdout, "Indirect branch from %p to %p\n",
 			src, dest);
+	if(test_lbr) {
+		test_lbr->AddBranchEntry(src, dest);
+		test_lbr->PrintLBRStack();
+	}
 }
 
-bool IsReturnInstrunction(INS ins) {
-	return false;
-}
 
 void InstrumentInstructions(INS ins, VOID* v) {
 	/**
@@ -95,8 +114,8 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 	PIN_InitSymbols();
+	test_lbr = new LBR(16);
 	INS_AddInstrumentFunction(InstrumentInstructions, NULL);
-	//IMG_AddInstrumentFunction(PrintModules, 0);
 	PIN_StartProgram();
 	return 0;
 }
