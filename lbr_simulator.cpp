@@ -1,8 +1,12 @@
+#include <map>
 #include <pin.H>
+#include <vector>
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
 
+
+std::map<VOID*, std::string> func_name_map;
 
 class LBR {
 public:
@@ -22,26 +26,27 @@ public:
 		}
 	}
 
-
 	void AddBranchEntry(VOID* src, VOID* dest) {
 		_tos_ptr = (_tos_ptr + 1) % _stack_size;
 		_src_msr_stack[_tos_ptr] = src;
 		_dst_msr_stack[_tos_ptr] = dest;
 	}
 
-	size_t GetTosPosition() {
+	size_t GetTosPosition() const {
 		return _tos_ptr;
 	}
 
-	void PrintLBRStack() {
+	void PrintLBRStack() const {
 		int stack_count = 0;
 		fprintf(stdout, "\nLBR Stack\n");
 		fprintf(stdout, "___________________\n");
 		for(int i = _tos_ptr; i >= 0; i--) {
-			fprintf(stdout, "[%d] Branch: %p | Target %p\n",
+			fprintf(stdout, "[%d] Branch: %p (%s) | Target %p (%s)\n",
 					stack_count + 1,
 					_src_msr_stack[i],
-					_dst_msr_stack[i]);
+					func_name_map[_src_msr_stack[i]].c_str(),
+					_dst_msr_stack[i],
+					func_name_map[_dst_msr_stack[i]].c_str());
 			stack_count += 1;
 		}
 		fprintf(stdout, "___________________\n");
@@ -56,6 +61,7 @@ private:
 
 // TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
+
 
 void PrintModules(IMG img, VOID* v) {
 	size_t image_cnt = 0;
@@ -81,8 +87,15 @@ void PrintModules(IMG img, VOID* v) {
 
 
 VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
-	fprintf(stdout, "Indirect branch from %p to %p\n",
-			src, dest);
+	RTN found_rtn;
+	if(func_name_map.find(dest) == func_name_map.end()) {
+		PIN_LockClient();
+		found_rtn = RTN_FindByAddress((ADDRINT)dest);
+		if(RTN_Valid(found_rtn)) {
+			func_name_map[dest] = RTN_Name(found_rtn);
+		}
+		PIN_UnlockClient();
+	}
 	if(test_lbr) {
 		test_lbr->AddBranchEntry(src, dest);
 		test_lbr->PrintLBRStack();
@@ -90,11 +103,13 @@ VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
 }
 
 
+
 void InstrumentInstructions(INS ins, VOID* v) {
 	/**
 	 * As per the paper, LBR was configured to only
 	 * record indirect jmps, rets and calls
 	 */
+	RTN ins_rtn;
 	if(INS_IsIndirectBranchOrCall(ins)) {
 		if(INS_IsCall(ins) || INS_IsRet(ins) || INS_IsFarRet(ins)
 				|| INS_IsFarJump(ins) || INS_IsBranch(ins)) {
@@ -102,10 +117,13 @@ void InstrumentInstructions(INS ins, VOID* v) {
 					(AFUNPTR)AnalyzeOnIndirectBranch,
 					IARG_INST_PTR, IARG_BRANCH_TARGET_ADDR,
 					IARG_END);
+			ins_rtn = INS_Rtn(ins);
+			if(RTN_Valid(ins_rtn)) {
+				func_name_map[(VOID*)INS_Address(ins)] = RTN_Name(ins_rtn);
+			}
 		}
 	}
 }
-
 
 
 int main(int argc, char *argv[]) {
