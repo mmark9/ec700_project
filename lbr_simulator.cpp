@@ -4,60 +4,10 @@
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
+#include "lbr.h"
 
 
 std::map<VOID*, std::string> func_name_map;
-
-class LBR {
-public:
-	LBR(size_t stack_size) {
-		_stack_size = stack_size;
-		_src_msr_stack = (VOID**)calloc(_stack_size, sizeof(VOID*));
-		_dst_msr_stack = (VOID**)calloc(_stack_size, sizeof(VOID*));
-		_tos_ptr = -1;
-	}
-
-	~LBR() {
-		if(_dst_msr_stack) {
-			free(_dst_msr_stack);
-		}
-		if(_src_msr_stack) {
-			free(_src_msr_stack);
-		}
-	}
-
-	void AddBranchEntry(VOID* src, VOID* dest) {
-		_tos_ptr = (_tos_ptr + 1) % _stack_size;
-		_src_msr_stack[_tos_ptr] = src;
-		_dst_msr_stack[_tos_ptr] = dest;
-	}
-
-	size_t GetTosPosition() const {
-		return _tos_ptr;
-	}
-
-	void PrintLBRStack() const {
-		int stack_count = 0;
-		fprintf(stdout, "\nLBR Stack\n");
-		fprintf(stdout, "___________________\n");
-		for(int i = _tos_ptr; i >= 0; i--) {
-			fprintf(stdout, "[%d] Branch: %p (%s) | Target %p (%s)\n",
-					stack_count + 1,
-					_src_msr_stack[i],
-					func_name_map[_src_msr_stack[i]].c_str(),
-					_dst_msr_stack[i],
-					func_name_map[_dst_msr_stack[i]].c_str());
-			stack_count += 1;
-		}
-		fprintf(stdout, "___________________\n");
-	}
-
-private:
-	size_t _stack_size;
-	VOID** _src_msr_stack;
-	VOID** _dst_msr_stack;
-	size_t _tos_ptr;
-};
 
 // TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
@@ -85,6 +35,22 @@ void PrintModules(IMG img, VOID* v) {
 	exit(0);
 }
 
+void PrintLbrStack(const LBR* lbr) {
+	int stack_count = 0;
+		fprintf(stdout, "\nLBR Stack\n");
+		fprintf(stdout, "___________________\n");
+		for(int i = lbr->GetTosPosition(); i >= 0; i--) {
+			fprintf(stdout, "[%d] Branch: %p (%s) | Target %p (%s)\n",
+					stack_count + 1,
+					lbr->GetSrcAt(i),
+					func_name_map[lbr->GetSrcAt(i)].c_str(),
+					lbr->GetDstAt(i),
+					func_name_map[lbr->GetDstAt(i)].c_str());
+			stack_count += 1;
+		}
+		fprintf(stdout, "___________________\n");
+}
+
 
 VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
 	RTN found_rtn;
@@ -98,7 +64,7 @@ VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
 	}
 	if(test_lbr) {
 		test_lbr->AddBranchEntry(src, dest);
-		test_lbr->PrintLBRStack();
+		PrintLbrStack(test_lbr);
 	}
 }
 

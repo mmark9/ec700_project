@@ -82,18 +82,21 @@ SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
 #TOOL_CXXFLAGS:=$(filter-out -Werror=permissive,$(TOOL_CXXFLAGS))
 #TOOL_CXXFLAGS:=$(TOOL_CXXFLAGS) -fpermissive
 
-MAIN_TU=lbr_simulator
-MAIN_TU_FILE=$(MAIN_TU).cpp
 
-MAIN_OBJ_LIST=$(OBJDIR)$(MAIN_TU)$(OBJ_SUFFIX)
+LBR_SIMULATOR_OBJ_LIST=$(OBJDIR)lbr_simulator$(OBJ_SUFFIX)\
+		$(OBJDIR)lbr$(OBJ_SUFFIX)
 
 $(OBJDIR): 
 	mkdir -p $@
 
-# main object list
-$(OBJDIR)$(MAIN_TU)$(OBJ_SUFFIX): $(MAIN_TU_FILE)
+# lbr class
+$(OBJDIR)lbr$(OBJ_SUFFIX): lbr.cpp
 	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
 
-# main object .so
-$(OBJDIR)$(MAIN_TU)$(PINTOOL_SUFFIX): $(MAIN_OBJ_LIST)
+# lbr simulator object
+$(OBJDIR)lbr_simulator$(OBJ_SUFFIX): lbr_simulator.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+# lbr_simulator .so
+$(OBJDIR)lbr_simulator$(PINTOOL_SUFFIX): $(LBR_SIMULATOR_OBJ_LIST)
 	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
