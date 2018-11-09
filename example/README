@@ -1,0 +1,12 @@
+Environment: ec521.bu.edu
+Attack model: no stack canary, NX bit protection disabled, ASLR disabled
+Attack goal: inject payload through insecure strcpy; overwrite return address of main;
+             use return oriented programming to call root shell by calling exec system call.
+
+HOW TO:
+1. Compile rop.c as: gcc -m32 -fno-stack-protector -static -o rop rop.c
+2. Search for gadgets with: ROPgadget --binary ./rop
+   or using peda.py: "dumprop" will create rop-rop.txt
+3. Assemble gadgets in exploit.py; figure out the right padding to overflow the buffer;
+   create payload: python exploit.py > exploit
+4. Test it: gdb --args rop "`cat exploit`"
