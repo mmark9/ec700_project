@@ -10,23 +10,24 @@
 
 class LBR {
 public:
-	LBR(size_t stack_size);
-	~LBR();
+    LBR(size_t stack_size);
+    ~LBR();
 
-	void AddBranchEntry(VOID* src, VOID* dest);
+    void AddBranchEntry(VOID* src, VOID* dest);
 
-	size_t GetTosPosition() const;
+    size_t GetStackSize() const;
+    size_t GetTosPosition() const;
 
-	void PrintLBRStack() const;
+    void PrintLBRStack() const;
 
-	VOID* GetDstAt(size_t i) const;
-	VOID* GetSrcAt(size_t i) const;
+    VOID* GetDstAt(size_t i) const;
+    VOID* GetSrcAt(size_t i) const;
 
 private:
-	size_t _stack_size;
-	VOID** _src_msr_stack;
-	VOID** _dst_msr_stack;
-	size_t _tos_ptr;
+    size_t _stack_size;
+    VOID** _src_msr_stack;
+    VOID** _dst_msr_stack;
+    size_t _tos_ptr;
 };
 
 
