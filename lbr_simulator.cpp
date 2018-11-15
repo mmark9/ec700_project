@@ -3,9 +3,11 @@
 #include <vector>
 #include <string>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include "lbr.h"
 
+#define CHAINTHRESHOLD 20
 
 std::map<VOID*, std::string> func_name_map;
 
@@ -35,6 +37,7 @@ void PrintModules(IMG img, VOID* v) {
     exit(0);
 }
 
+
 void PrintLbrStack(const LBR* lbr) {
     int stack_count = 0;
     fprintf(stdout, "\nLBR Stack\n");
@@ -56,6 +59,38 @@ void PrintLbrStack(const LBR* lbr) {
     fprintf(stdout, "___________________\n");
 }
 
+
+bool ROPDetected(const LBR* lbr) {
+    /* ROPDetection: Checks LBR stack for small and continuous jumps. 
+       If a continuous string of instructions less than or equal to
+       CHAINTHRESHOLD is found, then a ROP attack is reported.
+       - Output (bool): True if ROP attack discovered.
+    */
+
+    // Variable Declarations:
+    size_t sourcepoint = lbr->GetTosPosition(); 
+    size_t destpoint = sourcepoint - 1;
+    size_t checksdone = 0;
+    size_t maxchain = 0;
+    size_t currentchain = 0;
+    
+    while (checksdone < lbr->GetStackSize() - 1) {
+        if (sourcepoint == 0) { 
+            destpoint = lbr->GetStackSize() - 1;
+        }
+        if ((uintptr_t)lbr->GetSrcAt(sourcepoint) - 
+             (uintptr_t)lbr->GetDstAt(destpoint) <= CHAINTHRESHOLD) {
+            currentchain++;
+        } else {
+            maxchain = (currentchain > maxchain) ? currentchain : maxchain;
+            currentchain = 0;
+        }
+        sourcepoint = destpoint;
+        checksdone++;
+    }
+        
+    return (maxchain >= 1);
+}
 
 VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
     RTN found_rtn;
