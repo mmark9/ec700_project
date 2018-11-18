@@ -199,8 +199,7 @@ size_t GetDetectedGadgetCount(const LBR* lbr) {
 	while(check_count < lbr_stack_size - 1) {
 		branch = lbr->GetSrcAt(i);
 		if(i == 0) {
-			i = lbr->GetStackSize() - 1;
-			prev_branch_target = lbr->GetDstAt(i);
+			prev_branch_target = lbr->GetDstAt(lbr->GetStackSize() - 1);
 		} else {
 			prev_branch_target = lbr->GetDstAt(i - 1);
 		}
@@ -214,7 +213,10 @@ size_t GetDetectedGadgetCount(const LBR* lbr) {
 			PrintInstUntilRet(prev_branch_target);
 		}
 		check_count += 1;
-		i -= 1;
+		if(i == 0)
+			i = lbr->GetStackSize() - 1;
+		else
+			i -= 1;
 	}
 	return chain_count; // callers can then check if chain_count >= 1
 }
