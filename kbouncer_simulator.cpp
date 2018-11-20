@@ -14,12 +14,33 @@ extern "C" {
 
 std::map<VOID*, std::string> func_name_map;
 const size_t GADGET_INS_LENGTH_THRESHOLD = 20;
+const size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
 
 // TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
 
+bool IsIndirectControlFlowTransferInstruction(const char* inst_buf) {
+	// TODO: Find a better way to do this during at analysis time
+	// We use some heuristics to cut down on the number of searches
+	// Since there are a million jumps in x86 we just search for j
+	// since only jumps have j in their opcode string
+	if(strstr(inst_buf, "ret")
+			|| strstr(inst_buf, "j")
+			|| strstr(inst_buf, "call")
+			|| strstr(inst_buf, "enter")
+			|| strstr(inst_buf, "int")
+			|| strstr(inst_buf, "into")
+			|| strstr(inst_buf, "lcall")
+			|| strstr(inst_buf, "loop")
+			|| strstr(inst_buf, "bound")) {
+		return true;
+	} else {
+		return false;
+	}
+}
 
-VOID PrintInstUntilRet(VOID* pc) {
+
+VOID PrintInstUntilIndirectJump(VOID* pc) {
 	char inst_buf[2048];
 	uint8_t inst_bytes[15];
 	xed_decoded_inst_t xed_inst;
@@ -46,7 +67,7 @@ VOID PrintInstUntilRet(VOID* pc) {
 					" %p [INS]: %s | length: %lu\n",
 					(void*)pc_from_ptr, inst_buf, inst_length
 					);
-			if(strstr(inst_buf, "ret") != NULL) {
+			if(IsIndirectControlFlowTransferInstruction(inst_buf)) {
 				break;
 			} else {
 				pc_from_ptr += inst_length;
@@ -141,7 +162,7 @@ size_t GetNumberOfInstructionsBetween(VOID* branch, VOID* target) {
 	return ins_count;
 }
 
-bool PrecedesRetWithinThreshold(VOID* start_addr, VOID* ret_addr) {
+bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 	char inst_buf[2048];
 	uint8_t inst_bytes[15];
 	xed_decoded_inst_t xed_inst;
@@ -166,7 +187,7 @@ bool PrecedesRetWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 					);
 			inst_length = xed_decoded_inst_get_length(&xed_inst);
 			inst_count += 1;
-			if(strstr(inst_buf, "ret") != NULL) {
+			if(IsIndirectControlFlowTransferInstruction(inst_buf)) {
 				break;
 			} else {
 				pc_from_ptr += inst_length;
@@ -188,9 +209,36 @@ bool PrecedesRetWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 	}
 }
 
-size_t GetDetectedGadgetCount(const LBR* lbr) {
+bool IsReturnInstruction(VOID* pc) {
+	char inst_buf[2048];
+	uint8_t inst_bytes[15];
+	xed_decoded_inst_t xed_inst;
+	xed_error_enum_t ret_code;
+	xed_uint64_t runtime_addr;
+	xed_state_t dstate;
+	dstate.mmode = XED_MACHINE_MODE_LONG_64;
+	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
+	PIN_SafeCopy(inst_bytes, pc, XED_MAX_INSTRUCTION_BYTES);
+	ret_code = xed_decode(&xed_inst, inst_bytes, XED_MAX_INSTRUCTION_BYTES);
+	if(ret_code == XED_ERROR_NONE) {
+		runtime_addr = static_cast<xed_uint64_t>((ADDRINT)pc);
+		xed_format_context(
+				XED_SYNTAX_INTEL,
+				&xed_inst,
+				inst_buf, 2048,
+				runtime_addr, NULL, NULL
+				);
+		return strstr(inst_buf, "ret") != NULL;
+	} else {
+		return false;
+	}
+}
+
+size_t GetLongestDetectedGadgetSeqCount(const LBR* lbr) {
 	if(lbr->GetStackSize() <= 0) return 0;
 	size_t chain_count = 0;
+	size_t max_chain_count = 0;
 	size_t lbr_stack_size = lbr->GetStackSize();
 	size_t i = lbr->GetTosPosition();
 	size_t check_count = 0;
@@ -204,13 +252,17 @@ size_t GetDetectedGadgetCount(const LBR* lbr) {
 			prev_branch_target = lbr->GetDstAt(i - 1);
 		}
 		if(branch > prev_branch_target
-				&& !IsCallPrecededInstruction(lbr->GetDstAt(i))
-		        && PrecedesRetWithinThreshold(prev_branch_target, branch)) {
+		        && PrecedesIndirectJumpWithinThreshold(prev_branch_target, branch)) {
 			chain_count += 1;
 			fprintf(stdout,
-					"Checking Rb = %p | Rt(n - 1) = %p | Verdict its a gadget!\n",
+					"Rb = %p | Rt(n - 1) = %p | Seems gadget-like..\n",
 					branch, prev_branch_target);
-			PrintInstUntilRet(prev_branch_target);
+			PrintInstUntilIndirectJump(prev_branch_target);
+		} else {
+			if(chain_count > max_chain_count) {
+				max_chain_count = chain_count;
+			}
+			chain_count = 0;
 		}
 		check_count += 1;
 		if(i == 0)
@@ -218,7 +270,7 @@ size_t GetDetectedGadgetCount(const LBR* lbr) {
 		else
 			i -= 1;
 	}
-	return chain_count; // callers can then check if chain_count >= 1
+	return max_chain_count; // callers can then check if chain_count >= 8
 }
 
 
@@ -266,8 +318,7 @@ VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
 void InstrumentInstructions(INS ins, VOID* v) {
     RTN ins_rtn;
     if(INS_IsIndirectBranchOrCall(ins)) {
-        if(INS_IsRet(ins) || INS_IsFarRet(ins)) {
-            INS_InsertPredicatedCall(ins, IPOINT_BEFORE,
+        INS_InsertPredicatedCall(ins, IPOINT_BEFORE,
                     (AFUNPTR)AnalyzeOnIndirectBranch,
                     IARG_INST_PTR, IARG_BRANCH_TARGET_ADDR,
                     IARG_END);
@@ -275,18 +326,38 @@ void InstrumentInstructions(INS ins, VOID* v) {
             if(RTN_Valid(ins_rtn)) {
                 func_name_map[(VOID*)INS_Address(ins)] = RTN_Name(ins_rtn);
             }
-        }
     }
+}
+
+bool IllegalReturnsFoundInLBR(const LBR* lbr) {
+	if(lbr->GetStackSize() <= 0) return false;
+	bool illegal_ret_found = false;
+	for(size_t i = 0; i < lbr->GetStackSize(); i++) {
+		if(IsReturnInstruction(lbr->GetSrcAt(i)) &&
+				!IsCallPrecededInstruction(lbr->GetDstAt(i))) {
+			illegal_ret_found = true;
+			fprintf(stdout,
+					"Illegal ret %p -->  target %p\n",
+					lbr->GetSrcAt(i), lbr->GetDstAt(i));
+			break;
+		}
+	}
+	return illegal_ret_found;
 }
 
 VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 		SYSCALL_STANDARD std, VOID* v) {
 	// We do as LBR walk to verify integrity of control flow
 	PrintLbrStack(test_lbr);
-	size_t rops_detected = GetDetectedGadgetCount(test_lbr);
+	size_t chain_length = GetLongestDetectedGadgetSeqCount(test_lbr);
+	if(IllegalReturnsFoundInLBR(test_lbr)) {
+		fprintf(stdout, "ROP detected: Illegal return instruction found!\n");
+	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
+		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
+	}
 	fprintf(stdout,
-			"# of gadgets detected before syscall(%lu) = %lu\n",
-			PIN_GetSyscallNumber(ctxt, std), rops_detected);
+			"Longest gadget-like chain detected before syscall(%lu) = %lu\n",
+			PIN_GetSyscallNumber(ctxt, std), chain_length);
 }
 
 
