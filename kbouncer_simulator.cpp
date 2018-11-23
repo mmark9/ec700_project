@@ -339,7 +339,7 @@ bool IllegalReturnsFoundInLBR(const LBR* lbr) {
 			fprintf(stdout,
 					"Illegal ret %p -->  target %p\n",
 					lbr->GetSrcAt(i), lbr->GetDstAt(i));
-			break;
+			PrintInstUntilIndirectJump(lbr->GetDstAt(i));
 		}
 	}
 	return illegal_ret_found;
@@ -355,9 +355,9 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
 		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
 	}
-	fprintf(stdout,
+	/*fprintf(stdout,
 			"Longest gadget-like chain detected before syscall(%lu) = %lu\n",
-			PIN_GetSyscallNumber(ctxt, std), chain_length);
+			PIN_GetSyscallNumber(ctxt, std), chain_length);*/
 }
 
 
