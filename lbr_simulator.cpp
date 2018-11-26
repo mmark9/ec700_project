@@ -89,8 +89,9 @@ bool ROPDetected(const LBR* lbr) {
         checksdone++;
     }
         
-    return (maxchain >= 1);
+    return (maxchain > lbr->GetStackSize()/2);
 }
+
 
 VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
     RTN found_rtn;
@@ -105,6 +106,10 @@ VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
     if(test_lbr) {
         test_lbr->AddBranchEntry(src, dest);
         PrintLbrStack(test_lbr);
+        if (ROPDetected(test_lbr)) {
+            fprintf(stdout, "ROP ATTACK DETECTED! Exiting Program...\n");
+            exit(1);
+        }
     }
 }
 
