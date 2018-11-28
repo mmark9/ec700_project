@@ -87,9 +87,8 @@ module control_unit #(parameter CORE = 0,
                            (opcode == STORE)?   3'b101 :
                            (opcode == LOAD)?    3'b100 :
                            (opcode == BRANCH)?  3'b010 :
-                           ((opcode == JALR)  | (opcode == JAL) |
-                            (opcode == RDLBR) | (opcode == WRLBR))? 3'b011 :
-                           ((opcode == AUIPC) | (opcode == LUI))?   3'b110 : 0;
+                           ((opcode == JALR)  | (opcode == JAL) | (opcode == WRLBR))? 3'b011 :
+                           ((opcode == AUIPC) | (opcode == LUI))?                     3'b110 : 0;
 
     assign operand_A_sel = (opcode == AUIPC)?  2'b01 :
                            (opcode == LUI)?    2'b11 :
