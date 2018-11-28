@@ -35,6 +35,14 @@
 *.out
 *.app
 
-
 # End of https://www.gitignore.io/api/c++
 
+# PIN Simulation Files/Folders
+*.log
+
+# ModelSim Files/Folders
+*.mti
+*.mpf
+*.vstf
+*.v.bak
+Verilog_Implementation/BRISC-V_Work

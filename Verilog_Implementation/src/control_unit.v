@@ -1,4 +1,5 @@
 /*  @author : Adaptive & Secure Computing Systems (ASCS) Laboratory
+    @author : Michael Graziano
 
  *  Copyright (c) 2018 BRISC-V (ASCS/ECE/BU)
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -30,7 +31,7 @@ module control_unit #(parameter CORE = 0,
                        PRINT_CYCLES_MIN = 1, PRINT_CYCLES_MAX = 1000 )(
     clock, reset,
     opcode,
-    branch_op, memRead,
+    branch_op, memRead, lbrReq,
     memtoReg, ALUOp,
     next_PC_sel,
     operand_A_sel, operand_B_sel,
@@ -45,7 +46,8 @@ module control_unit #(parameter CORE = 0,
 
     output branch_op;
     output memRead;
-    output memtoReg;
+    output [1:0] lbrReq;
+    output [1:0] memtoReg;
     output [2:0] ALUOp;
     output memWrite;
     output [1:0] next_PC_sel;
@@ -65,23 +67,29 @@ module control_unit #(parameter CORE = 0,
                     AUIPC   = 7'b0010111,
                     LUI     = 7'b0110111,
                     FENCES  = 7'b0001111,
-                    SYSCALL = 7'b1110011;
+                    SYSCALL = 7'b1110011,
+                    RDLBR   = 7'b0001011,
+                    WRLBR   = 7'b0101011;
 
     assign regWrite      = ((opcode == R_TYPE) | (opcode == I_TYPE) | (opcode == LOAD)
                             | (opcode == JALR) | (opcode == JAL) | (opcode == AUIPC)
-                            | (opcode == LUI))? 1 : 0;
+                            | (opcode == LUI) | (opcode == RDLBR))? 1 : 0;
     assign memWrite      = (opcode == STORE)?   1 : 0;
     assign branch_op     = (opcode == BRANCH)?  1 : 0;
     assign memRead       = (opcode == LOAD)?    1 : 0;
-    assign memtoReg      = (opcode == LOAD)?    1 : 0;
+    assign lbrReq        = (opcode == RDLBR)?   2'b10 :
+                           (opcode == WRLBR)?   2'b11 : 2'b00;
+    assign memtoReg      = (opcode == RDLBR)?   2'b10 :
+                           (opcode == LOAD)?    2'b01 : 2'b00;
 
     assign ALUOp         = (opcode == R_TYPE)?  3'b000 :
                            (opcode == I_TYPE)?  3'b001 :
                            (opcode == STORE)?   3'b101 :
                            (opcode == LOAD)?    3'b100 :
                            (opcode == BRANCH)?  3'b010 :
-                           ((opcode == JALR)  | (opcode == JAL))? 3'b011 :
-                           ((opcode == AUIPC) | (opcode == LUI))? 3'b110 : 0;
+                           ((opcode == JALR)  | (opcode == JAL) |
+                            (opcode == RDLBR) | (opcode == WRLBR))? 3'b011 :
+                           ((opcode == AUIPC) | (opcode == LUI))?   3'b110 : 0;
 
     assign operand_A_sel = (opcode == AUIPC)?  2'b01 :
                            (opcode == LUI)?    2'b11 :
@@ -108,6 +116,7 @@ always @ (posedge clock) begin
         $display ("| Opcode      [%b]", opcode);
         $display ("| Branch_op   [%b]", branch_op);
         $display ("| memRead     [%b]", memRead);
+        $display ("| lbrReq      [%b]", lbrReq);
         $display ("| memtoReg    [%b]", memtoReg);
         $display ("| memWrite    [%b]", memWrite);
         $display ("| RegWrite    [%b]", regWrite);
