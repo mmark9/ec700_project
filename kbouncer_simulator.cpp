@@ -19,7 +19,7 @@ const size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
 // TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
 
-bool IsIndirectControlFlowTransferInstruction(const char* inst_buf) {
+bool IsControlFlowTransferInstruction(const char* inst_buf) {
 	// TODO: Find a better way to do this during at analysis time
 	// We use some heuristics to cut down on the number of searches
 	// Since there are a million jumps in x86 we just search for j
@@ -39,8 +39,14 @@ bool IsIndirectControlFlowTransferInstruction(const char* inst_buf) {
 	}
 }
 
+bool InsHasMemoryRead(const xed_decoded_inst_t* xed_inst, size_t no_ops) {
+	for(size_t i = 0; i < no_ops; i++) {
+		if(xed_decoded_inst_mem_read(xed_inst, i)) return true;
+	}
+	return false;
+}
 
-VOID PrintInstUntilIndirectJump(VOID* pc) {
+VOID PrintInstUntilIndirectJump(const VOID* pc) {
 	char inst_buf[2048];
 	uint8_t inst_bytes[15];
 	xed_decoded_inst_t xed_inst;
@@ -48,6 +54,9 @@ VOID PrintInstUntilIndirectJump(VOID* pc) {
 	xed_uint64_t runtime_addr;
 	size_t inst_length = 0;
 	xed_state_t dstate;
+	size_t operand_count = 0;
+	bool is_memory_read = false;
+	size_t inst_count = 0;
 	dstate.mmode = XED_MACHINE_MODE_LONG_64;
 	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
 	ADDRINT pc_from_ptr = (ADDRINT)pc;
@@ -56,6 +65,9 @@ VOID PrintInstUntilIndirectJump(VOID* pc) {
 		PIN_SafeCopy(inst_bytes, (VOID*)pc_from_ptr, XED_MAX_INSTRUCTION_BYTES);
 		ret_code = xed_decode(&xed_inst, inst_bytes, XED_MAX_INSTRUCTION_BYTES);
 		if(ret_code == XED_ERROR_NONE) {
+			inst_count += 1;
+			operand_count = xed_decoded_inst_noperands(&xed_inst);
+			is_memory_read = InsHasMemoryRead(&xed_inst, operand_count);
 			runtime_addr = static_cast<xed_uint64_t>(pc_from_ptr);
 			xed_format_context(
 					XED_SYNTAX_INTEL,
@@ -64,10 +76,16 @@ VOID PrintInstUntilIndirectJump(VOID* pc) {
 					);
 			inst_length = xed_decoded_inst_get_length(&xed_inst);
 			fprintf(stdout,
-					" %p [INS]: %s | length: %lu\n",
-					(void*)pc_from_ptr, inst_buf, inst_length
+					"[%lu] %p [INS]: %s | length: %lu | # operands: %lu | memory is read: %s\n",
+					inst_count, (void*)pc_from_ptr, inst_buf, inst_length,
+					operand_count, is_memory_read ? "yes" : "no"
 					);
-			if(IsIndirectControlFlowTransferInstruction(inst_buf)) {
+			if(IsControlFlowTransferInstruction(inst_buf) && is_memory_read) {
+				break;
+			} else if(inst_count >= GADGET_INS_LENGTH_THRESHOLD) {
+				fprintf(stdout,
+						"Stopping INS walk at PC %p; no indirect jump found so far..\n",
+						(void*)pc_from_ptr);
 				break;
 			} else {
 				pc_from_ptr += inst_length;
@@ -162,7 +180,7 @@ size_t GetNumberOfInstructionsBetween(VOID* branch, VOID* target) {
 	return ins_count;
 }
 
-bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
+bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* jmp_addr) {
 	char inst_buf[2048];
 	uint8_t inst_bytes[15];
 	xed_decoded_inst_t xed_inst;
@@ -171,6 +189,8 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 	size_t inst_length = 0;
 	xed_state_t dstate;
 	size_t inst_count = 0;
+	size_t operand_count = 0;
+	bool is_memory_read = false;
 	dstate.mmode = XED_MACHINE_MODE_LONG_64;
 	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
 	ADDRINT pc_from_ptr = (ADDRINT)start_addr;
@@ -178,6 +198,8 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
 		PIN_SafeCopy(inst_bytes, (VOID*)pc_from_ptr, XED_MAX_INSTRUCTION_BYTES);
 		ret_code = xed_decode(&xed_inst, inst_bytes, XED_MAX_INSTRUCTION_BYTES);
+		operand_count = xed_decoded_inst_noperands(&xed_inst);
+		is_memory_read = InsHasMemoryRead(&xed_inst, operand_count);
 		if(ret_code == XED_ERROR_NONE) {
 			runtime_addr = static_cast<xed_uint64_t>(pc_from_ptr);
 			xed_format_context(
@@ -187,7 +209,8 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 					);
 			inst_length = xed_decoded_inst_get_length(&xed_inst);
 			inst_count += 1;
-			if(IsIndirectControlFlowTransferInstruction(inst_buf)) {
+			if((IsControlFlowTransferInstruction(inst_buf) && is_memory_read)
+					|| inst_count >= GADGET_INS_LENGTH_THRESHOLD) {
 				break;
 			} else {
 				pc_from_ptr += inst_length;
@@ -202,8 +225,8 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* ret_addr) {
 		memset(inst_buf, 0, 2048);
 	    memset(inst_bytes, 0, 15);
 	}
-	if((VOID*)pc_from_ptr == ret_addr) {
-		return inst_length <= GADGET_INS_LENGTH_THRESHOLD;
+	if((VOID*)pc_from_ptr == jmp_addr) {
+		return inst_count <= GADGET_INS_LENGTH_THRESHOLD;
 	} else {
 		return false;
 	}
@@ -259,6 +282,9 @@ size_t GetLongestDetectedGadgetSeqCount(const LBR* lbr) {
 					branch, prev_branch_target);
 			PrintInstUntilIndirectJump(prev_branch_target);
 		} else {
+			if(chain_count > 0) fprintf(stdout,
+					"\n**** Chain reset | current len: %lu | max len so far: %lu ****\n\n",
+					chain_count, max_chain_count);
 			if(chain_count > max_chain_count) {
 				max_chain_count = chain_count;
 			}
@@ -348,6 +374,9 @@ bool IllegalReturnsFoundInLBR(const LBR* lbr) {
 VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 		SYSCALL_STANDARD std, VOID* v) {
 	// We do as LBR walk to verify integrity of control flow
+	fprintf(stdout,
+			"\n[ Printing ROP diagnostics prior to syscall(%lu) ]\n\n",
+			PIN_GetSyscallNumber(ctxt, std));
 	PrintLbrStack(test_lbr);
 	size_t chain_length = GetLongestDetectedGadgetSeqCount(test_lbr);
 	if(IllegalReturnsFoundInLBR(test_lbr)) {
