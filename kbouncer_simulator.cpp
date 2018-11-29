@@ -1,4 +1,5 @@
 #include <map>
+#include <time.h>
 #include <pin.H>
 #include <vector>
 #include <string>
@@ -18,8 +19,11 @@ std::map<VOID*, std::string> func_name_map;
 size_t GADGET_INS_LENGTH_THRESHOLD = 20;
 size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
 
-// TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
+
+// Simulation timing
+time_t start_time;
+time_t end_time;
 
 KNOB<string> enable_checks_flag_arg(
 		KNOB_MODE_WRITEONCE,
@@ -48,6 +52,25 @@ KNOB<string> lbr_size_arg(
 		"lbr_size",
 		"16",
 		"Size of LBR stack (default: 16)");
+
+
+/**
+ * Credit for original logic
+ * https://stackoverflow.com/questions/6749621/how-to-create-a-high-resolution-timer-in-linux-to-measure-program-performance
+ */
+// call this function to start a nanosecond-resolution timer
+struct timespec GetElapsedTime(struct timespec start, struct timespec end)
+{
+    struct timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+        temp.tv_sec = end.tv_sec-start.tv_sec-1;
+        temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {
+        temp.tv_sec = end.tv_sec-start.tv_sec;
+        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+}
 
 bool IsControlFlowTransferInstruction(const char* inst_buf) {
 	// TODO: Find a better way to do this during at analysis time
@@ -417,6 +440,18 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 }
 
 
+VOID OutputSummary(INT32 code, VOID* v) {
+	end_time = time(NULL);
+    time_t elapsed_time = end_time - start_time;
+    fprintf(stderr,
+    		"%s,%lu,%lu,%lu,%lu\n",
+    		kbouncer_checks_enabled ? "yes" : "no",
+    		lbr_stack_size,
+			GADGET_INS_LENGTH_THRESHOLD,
+			GADGET_CHAIN_LENGTH_THRESHOLD,
+			elapsed_time);
+}
+
 int main(int argc, char *argv[]) {
     // Initialize pin & symbol manager
     if (PIN_Init(argc, argv)) {
@@ -452,6 +487,8 @@ int main(int argc, char *argv[]) {
     test_lbr = new LBR(lbr_stack_size);
     INS_AddInstrumentFunction(InstrumentInstructions, NULL);
     PIN_AddSyscallEntryFunction(CheckForRopBeforeSysCall, NULL);
+    PIN_AddFiniFunction(OutputSummary, 0);
+    start_time = time(NULL);
     PIN_StartProgram();
     return 0;
 }
