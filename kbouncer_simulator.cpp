@@ -19,7 +19,7 @@ std::map<VOID*, std::string> func_name_map;
 size_t GADGET_INS_LENGTH_THRESHOLD = 20;
 size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
 
-LBR* test_lbr = NULL;
+LBR* lbr_instance = NULL;
 
 // Simulation timing
 time_t start_time;
@@ -385,8 +385,8 @@ VOID AnalyzeOnIndirectBranch(VOID* src, VOID* dest) {
         }
         PIN_UnlockClient();
     }
-    if(test_lbr) {
-        test_lbr->AddBranchEntry(src, dest);
+    if(lbr_instance) {
+        lbr_instance->AddBranchEntry(src, dest);
         //PrintInstUntilRet(dest);
         //PrintLbrStack(test_lbr);
     }
@@ -430,9 +430,9 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 	fprintf(stdout,
 			"\n[ Printing ROP diagnostics prior to syscall(%lu) ]\n\n",
 			PIN_GetSyscallNumber(ctxt, std));
-	PrintLbrStack(test_lbr);
-	size_t chain_length = GetLongestDetectedGadgetSeqCount(test_lbr);
-	if(IllegalReturnsFoundInLBR(test_lbr)) {
+	PrintLbrStack(lbr_instance);
+	size_t chain_length = GetLongestDetectedGadgetSeqCount(lbr_instance);
+	if(IllegalReturnsFoundInLBR(lbr_instance)) {
 		fprintf(stdout, "ROP detected: Illegal return instruction found!\n");
 	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
 		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
@@ -484,7 +484,7 @@ int main(int argc, char *argv[]) {
 			GADGET_CHAIN_LENGTH_THRESHOLD);
     PIN_InitSymbols();
     xed_tables_init();
-    test_lbr = new LBR(lbr_stack_size);
+    lbr_instance = new LBR(lbr_stack_size);
     INS_AddInstrumentFunction(InstrumentInstructions, NULL);
     PIN_AddSyscallEntryFunction(CheckForRopBeforeSysCall, NULL);
     PIN_AddFiniFunction(OutputSummary, 0);
