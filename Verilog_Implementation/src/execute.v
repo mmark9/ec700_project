@@ -59,7 +59,7 @@ reg old_stall;
 reg [ADDRESS_BITS-1:0] old_JALR_target;
 
 wire [5:0] ALU_Control = (ALU_Operation == 3'b011)? 
-                         6'b011_111 :      //pass for JAL and JALR
+                         6'b011_111 :      //pass for JAL, JALR & WRLBR
                          (ALU_Operation == 3'b010)? 
                          {3'b010,funct3} : //branches
 

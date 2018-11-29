@@ -45,4 +45,5 @@
 *.mpf
 *.vstf
 *.v.bak
+*.wlf
 Verilog_Implementation/BRISC-V_Work

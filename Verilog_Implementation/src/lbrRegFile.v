@@ -1,5 +1,6 @@
-/** @module : regFile
+/** @module : lbrRegFile
  *  @author : Adaptive & Secure Computing Systems (ASCS) Laboratory
+ *  @author : Michael Graziano
  
  *  Copyright (c) 2018 BRISC-V (ASCS/ECE/BU)
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,32 +22,40 @@
  */
 
 // Parameterized register file
-module regFile #(parameter REG_DATA_WIDTH = 32, REG_SEL_BITS = 5) (
-                clock, reset, read_sel1, read_sel2,
-                wEn, write_sel, write_data, 
-                read_data1, read_data2
+// Assumptions: This Register File will be used in conjunction with the top module LBR.
+//              This top module should contain the appropriate logic that will prevent
+//              multiple writes to the same register in a single clock cycle.
+module lbrRegFile #(parameter DATA_WIDTH = 64, LBR_SIZE = 16) (
+                clock, reset, read_sel,
+                wEn0, wEn1, wEn2,
+                write_sel0, write_sel1, write_sel2,
+                write_data0, write_data1, write_data2, 
+                read_data
 );
 
-input clock, reset, wEn; 
-input [REG_DATA_WIDTH-1:0] write_data;
-input [REG_SEL_BITS-1:0] read_sel1, read_sel2, write_sel;
-output[REG_DATA_WIDTH-1:0] read_data1; 
-output[REG_DATA_WIDTH-1:0] read_data2; 
+input clock, reset, wEn0, wEn1, wEn2; 
+input [DATA_WIDTH-1:0] write_data0, write_data1, write_data2;
+input [($clog2(LBR_SIZE)+2)-1:0] read_sel, write_sel0, write_sel1, write_sel2;
+output[DATA_WIDTH-1:0] read_data;  
 
 (* ram_style = "distributed" *) 
-reg   [REG_DATA_WIDTH-1:0] register_file[0:(1<<REG_SEL_BITS)-1];
+reg   [DATA_WIDTH-1:0] register_file[0:(1<<($clog2(LBR_SIZE)+2))-1];
 integer i; 
 
-always @(posedge clock)
+always @(posedge clock) begin
     if(reset==1)
-        register_file[0] <= 0; 
-    else 
-        if (wEn & write_sel != 0) register_file[write_sel] <= write_data;
+        for (i = 0; i < (1<<($clog2(LBR_SIZE)+2)); i=i+1) 
+        	register_file[i] <= 0; 
+    else begin
+        register_file[write_sel0] <= (wEn0)? write_data0 : register_file[write_sel0];
+        register_file[write_sel1] <= (wEn1)? write_data1 : register_file[write_sel1];
+        register_file[write_sel2] <= (wEn2)? write_data2 : register_file[write_sel2];
+    end
+end
           
 //----------------------------------------------------
 // Drive the outputs
 //----------------------------------------------------
-assign  read_data1 = register_file[read_sel1];
-assign  read_data2 = register_file[read_sel2];
+assign  read_data = register_file[read_sel];
 
 endmodule
