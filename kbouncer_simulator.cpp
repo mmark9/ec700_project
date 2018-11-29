@@ -12,12 +12,42 @@ extern "C" {
 
 #include "lbr.h"
 
+size_t lbr_stack_size = 16;
+bool kbouncer_checks_enabled = true;
 std::map<VOID*, std::string> func_name_map;
-const size_t GADGET_INS_LENGTH_THRESHOLD = 20;
-const size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
+size_t GADGET_INS_LENGTH_THRESHOLD = 20;
+size_t GADGET_CHAIN_LENGTH_THRESHOLD = 8;
 
 // TODO: create mapping for LBR per thread
 LBR* test_lbr = NULL;
+
+KNOB<string> enable_checks_flag_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"enable_checks",
+		"true",
+		"Determines if kbouncer checks should be active (default: true)");
+
+KNOB<string> ins_limit_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"ins_limit",
+		"20",
+		"Upper bound on the number of gadget instructions (default: 20)");
+
+KNOB<string> chain_limit_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"chain_min",
+		"8",
+		"Lower bound on the number of consecutive gadget-like blocks for ROP (default: 8)");
+
+KNOB<string> lbr_size_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"lbr_size",
+		"16",
+		"Size of LBR stack (default: 16)");
 
 bool IsControlFlowTransferInstruction(const char* inst_buf) {
 	// TODO: Find a better way to do this during at analysis time
@@ -148,7 +178,6 @@ bool IsCallPrecededInstruction(VOID* dest) {
 	//fprintf(stdout, "\n");
 	return found_call_instruction;
 }
-
 
 size_t GetNumberOfInstructionsBetween(VOID* branch, VOID* target) {
 	uint8_t inst_bytes[15];
@@ -374,6 +403,7 @@ bool IllegalReturnsFoundInLBR(const LBR* lbr) {
 VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 		SYSCALL_STANDARD std, VOID* v) {
 	// We do as LBR walk to verify integrity of control flow
+	if(!kbouncer_checks_enabled) return;
 	fprintf(stdout,
 			"\n[ Printing ROP diagnostics prior to syscall(%lu) ]\n\n",
 			PIN_GetSyscallNumber(ctxt, std));
@@ -384,9 +414,6 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
 		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
 	}
-	/*fprintf(stdout,
-			"Longest gadget-like chain detected before syscall(%lu) = %lu\n",
-			PIN_GetSyscallNumber(ctxt, std), chain_length);*/
 }
 
 
@@ -395,9 +422,34 @@ int main(int argc, char *argv[]) {
     if (PIN_Init(argc, argv)) {
         return -1;
     }
+    std::string enable_checks_str = enable_checks_flag_arg.Value();
+    std::string ins_limit_str = ins_limit_arg.Value();
+    std::string chain_limit_str = chain_limit_arg.Value();
+    std::string lbr_size_str = lbr_size_arg.Value();
+    if(strcasecmp(enable_checks_str.c_str(), "true") == 0) {
+    	kbouncer_checks_enabled = true;
+    } else {
+    	kbouncer_checks_enabled = false;
+    }
+    int ins_limit_int = atoi(ins_limit_str.c_str());
+    if(ins_limit_int > 0) GADGET_INS_LENGTH_THRESHOLD = ins_limit_int;
+    int chain_limit_int = atoi(chain_limit_str.c_str());
+    if(chain_limit_int > 0) GADGET_CHAIN_LENGTH_THRESHOLD = chain_limit_int;
+    int lbr_size_int = atoi(lbr_size_str.c_str());
+    if(lbr_size_int > 0) lbr_stack_size = lbr_size_int;
+    fprintf(stdout,
+    		"\nSimulation configuration\n"
+    		"\tKbouncer checks enabled: %s\n"
+    		"\tLBR stack size: %lu\n"
+			"\tMax gadget instruction length: %lu\n"
+			"\tMin consecutive gadget chain length: %lu\n",
+			kbouncer_checks_enabled ? "YES" : "NO",
+			lbr_stack_size,
+			GADGET_INS_LENGTH_THRESHOLD,
+			GADGET_CHAIN_LENGTH_THRESHOLD);
     PIN_InitSymbols();
     xed_tables_init();
-    test_lbr = new LBR(16);
+    test_lbr = new LBR(lbr_stack_size);
     INS_AddInstrumentFunction(InstrumentInstructions, NULL);
     PIN_AddSyscallEntryFunction(CheckForRopBeforeSysCall, NULL);
     PIN_StartProgram();
