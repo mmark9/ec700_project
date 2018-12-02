@@ -28,15 +28,17 @@ module memory_pipe_unit #(parameter  DATA_WIDTH = 32,
     input clock,reset,
     input [DATA_WIDTH-1:0] ALU_result_memory,
     input [DATA_WIDTH-1:0] load_data_memory,
+    input [DATA_WIDTH-1:0] lbr_data_memory,
     input opwrite_memory,
-    input opsel_memory,
+    input [1:0] opsel_memory,
     input [4:0] opReg_memory,
     input [DATA_WIDTH-1:0] instruction_memory,
 
     output [DATA_WIDTH-1:0] ALU_result_writeback,
     output [DATA_WIDTH-1:0] load_data_writeback,
+    output [DATA_WIDTH-1:0] lbr_data_writeback,
     output opwrite_writeback,
-    output opsel_writeback,
+    output [1:0] opsel_writeback,
     output [4:0] opReg_writeback,
     output [DATA_WIDTH-1:0] instruction_writeback
     );
@@ -45,13 +47,15 @@ localparam NOP = 32'h00000013;
 
 reg    [DATA_WIDTH-1:0] ALU_result_memory_to_writeback;
 reg    [DATA_WIDTH-1:0] load_data_memory_to_writeback;
+reg    [DATA_WIDTH-1:0] lbr_data_memory_to_writeback;
 reg    opwrite_memory_to_writeback;
-reg    opsel_memory_to_writeback;
+reg    [1:0] opsel_memory_to_writeback;
 reg    [4:0] opReg_memory_to_writeback;
 reg    [DATA_WIDTH-1:0] instruction_memory_to_writeback;
 
 assign ALU_result_writeback = ALU_result_memory_to_writeback;
 assign load_data_writeback  = load_data_memory_to_writeback;
+assign lbr_data_writeback   = lbr_data_memory_to_writeback;
 assign opwrite_writeback    = opwrite_memory_to_writeback;
 assign opsel_writeback      = opsel_memory_to_writeback;
 assign opReg_writeback      = opReg_memory_to_writeback;
@@ -61,8 +65,9 @@ always @(posedge clock) begin
     if(reset) begin
         ALU_result_memory_to_writeback  <= {DATA_WIDTH{1'b0}};
         load_data_memory_to_writeback   <= {DATA_WIDTH{1'b0}};
+        lbr_data_memory_to_writeback    <= {DATA_WIDTH{1'b0}};
         opwrite_memory_to_writeback     <= 1'b0;
-        opsel_memory_to_writeback       <= 1'b0;
+        opsel_memory_to_writeback       <= 2'b0;
         opReg_memory_to_writeback       <= 5'b0;
         instruction_memory_to_writeback <= NOP;
     end

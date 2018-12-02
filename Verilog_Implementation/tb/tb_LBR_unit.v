@@ -26,8 +26,8 @@ module tb_LBR_unit();
  
 reg clock, reset, stall;
 reg [1:0] lbrReq, next_PC_sel;
-reg [15:0] ALU_result;
-reg [11:0] RW_address, PC_address, JAL_target, JALR_target;
+reg [15:0] ALU_result, RW_address;
+reg [11:0] PC_address, JAL_target, JALR_target;
 
 wire [15:0] output_data;
 
@@ -58,9 +58,9 @@ LBR_unit #(16, 12, 8) LBR (
           next_PC_sel = 2'b00;
           RW_address = 16'h0000;
           ALU_result = 16'h0000;
-          PC_address = 16'h0000;
-          JAL_target = 16'h0000;
-          JALR_target = 16'h0000;
+          PC_address = 12'h000;
+          JAL_target = 12'h000;
+          JALR_target = 12'h000;
           repeat (1) @ (posedge clock);
           
           #1 reset = 0;

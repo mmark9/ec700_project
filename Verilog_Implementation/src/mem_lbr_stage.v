@@ -24,7 +24,6 @@
 module mem_lbr_stage #(
     parameter CORE = 0,
     parameter DATA_WIDTH = 32,
-    parameter LBR_DATA_WIDTH = 64,
     parameter LBR_SIZE = 16,
     parameter INDEX_BITS = 6,
     parameter OFFSET_BITS = 3,
@@ -41,18 +40,38 @@ module mem_lbr_stage #(
     input [1:0] lbrReq,
     input [1:0] next_PC_sel,
     input [ADDRESS_BITS-1:0] address,
+    input [ADDRESS_BITS-1:0] PC_address,
+    input [ADDRESS_BITS-1:0] JAL_target,
+    input [ADDRESS_BITS-1:0] JALR_target,
     input [DATA_WIDTH-1:0] store_data,
     input [DATA_WIDTH-1:0] RW_address,
-    input [DATA_WIDTH-1:0] PC_address,
-    input [DATA_WIDTH-1:0]
     input [DATA_WIDTH-1:0] ALU_Result,
     
     output [ADDRESS_BITS-1:0] data_addr,
     output [DATA_WIDTH-1:0] load_data,
+    output [DATA_WIDTH-1:0] lbr_data,
+    output [DATA_WIDTH-1:0] bypass_data,
     output valid,
     output ready,
     input report
- 
+);
+
+LBR_unit #(
+    .DATA_WIDTH(DATA_WIDTH),
+    .ADDRESS_BITS(ADDRESS_BITS),
+    .LBR_SIZE(LBR_SIZE)
+) LBR_system (
+    .clock(clock),
+    .reset(reset),
+    .stall(stall),
+    .lbrReq(lbrReq),
+    .next_PC_sel(next_PC_sel),
+    .RW_address(RW_address),
+    .ALU_result(ALU_Result),
+    .PC_address(PC_address),
+    .JAL_target(JAL_target),
+    .JALR_target(JALR_target),
+    .output_data(output_data)
 );
 
 d_mem_interface #(
@@ -61,7 +80,7 @@ d_mem_interface #(
     .INDEX_BITS(INDEX_BITS),
     .OFFSET_BITS(OFFSET_BITS),
     .ADDRESS_BITS(ADDRESS_BITS)
-) d_mem_interface0 (
+) d_mem_interfac0 (
     .clock(clock),
     .reset(reset),
     .stall(stall),
@@ -75,6 +94,9 @@ d_mem_interface #(
     .ready(ready),
     .report(report)
 );
+
+assign bypass_data = (opSel == 2'b10)? lbr_data  :
+                     (opSel == 2'b01)? load_data : ALU_Result;
 
 reg [31: 0] cycles;
 always @ (posedge clock) begin

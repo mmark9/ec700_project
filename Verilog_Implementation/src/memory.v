@@ -44,7 +44,6 @@ module memory_unit #(
     output valid,
     output ready,
     input report
- 
 );
 
 d_mem_interface #(

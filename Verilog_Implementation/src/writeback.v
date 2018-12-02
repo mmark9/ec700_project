@@ -27,7 +27,8 @@
       opSel, 
       opReg, 
       ALU_Result, 
-      memory_data, 
+      memory_data,
+      LBR_data,
       write, write_reg, write_data, 
       report
 ); 
@@ -36,10 +37,11 @@ input  clock;
 input  reset; 
 input  stall;
 input  opWrite; 
-input  opSel; 
-input  [4:0]  opReg;
+input  [1:0] opSel; 
+input  [4:0] opReg;
 input  [DATA_WIDTH-1:0] ALU_Result;
 input  [DATA_WIDTH-1:0] memory_data; 
+input  [DATA_WIDTH-1:0] LBR_data;
 
 output  write;
 output  [4:0]  write_reg;
@@ -47,7 +49,8 @@ output  [DATA_WIDTH-1:0] write_data;
 
 input report; 
 
-assign write_data = opSel? memory_data : ALU_Result; 
+assign write_data = (opSel == 2'b10)? LBR_data :
+                    (opSel == 2'b01)? memory_data : ALU_Result; 
 assign write_reg  = opReg; 
 assign write      = opWrite; 
 

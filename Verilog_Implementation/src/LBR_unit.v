@@ -29,8 +29,8 @@ module LBR_unit #(parameter DATA_WIDTH = 32, ADDRESS_BITS = 20, LBR_SIZE = 16) (
 
 input clock, reset, stall;
 input [1:0] lbrReq, next_PC_sel;
-input [ADDRESS_BITS-1:0] RW_address, PC_address, JAL_target, JALR_target;
-input [DATA_WIDTH-1:0] ALU_result;
+input [ADDRESS_BITS-1:0] PC_address, JAL_target, JALR_target;
+input [DATA_WIDTH-1:0] RW_address, ALU_result;
 output [DATA_WIDTH-1:0] output_data;
 
 wire wEn0, wEn1, wEn2;
