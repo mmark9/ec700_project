@@ -36,7 +36,7 @@ wire wEn0, wEn1, wEn2;
 wire [($clog2(LBR_SIZE)+2)-1:0] read_sel, write_sel0, write_sel1, write_sel2;
 wire [DATA_WIDTH-1:0] write_data0, write_data1, write_data2;
 
-localparam [($clog2(LBR_SIZE)+2)-1:0] TOS_ADDR = {1'b1,{(($clog2(LBR_SIZE)+2)-2){1'b0}}};
+localparam [($clog2(LBR_SIZE)+2)-1:0] TOS_ADDR = 1<<(($clog2(LBR_SIZE)+2)-1);
 
 assign read_sel = (lbrReq[1])? RW_address[($clog2(LBR_SIZE)+2)-1:0] : TOS_ADDR;
 assign wEn0 = lbrReq[0] ^ (~stall & next_PC_sel[1]);
@@ -62,7 +62,7 @@ lbrRegFile #(DATA_WIDTH, LBR_SIZE) lbrRegister(
     .write_data0(write_data0),
     .write_data1(write_data1),
     .write_data2(write_data2),
-    .read_data(read_data)
+    .read_data(output_data)
 );
 
 endmodule
