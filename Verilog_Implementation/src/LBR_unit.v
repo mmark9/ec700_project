@@ -21,7 +21,7 @@
  *  THE SOFTWARE.
  */
 
-module LBR_unit #(parameter DATA_WIDTH = 64, LBR_SIZE = 16) (
+module LBR_unit #(parameter DATA_WIDTH = 32, ADDRESS_BITS = 20, LBR_SIZE = 16) (
                 clock, reset, stall, lbrReq, next_PC_sel,
 		RW_address, ALU_result, PC_address, JAL_target, JALR_target,
                 output_data
@@ -29,7 +29,8 @@ module LBR_unit #(parameter DATA_WIDTH = 64, LBR_SIZE = 16) (
 
 input clock, reset, stall;
 input [1:0] lbrReq, next_PC_sel;
-input [DATA_WIDTH-1:0] RW_address, ALU_result, PC_address, JAL_target, JALR_target;
+input [ADDRESS_BITS-1:0] RW_address, PC_address, JAL_target, JALR_target;
+input [DATA_WIDTH-1:0] ALU_result;
 output [DATA_WIDTH-1:0] output_data;
 
 wire wEn0, wEn1, wEn2;
@@ -47,9 +48,9 @@ assign wEn2 = wEn1;
 assign write_sel0 = read_sel;
 assign write_sel1 = {2'b00, TOS_PTR};
 assign write_sel2 = {2'b01, TOS_PTR};
-assign write_data0 = (lbrReq[0])? ALU_result : {{(64-($clog2(LBR_SIZE))){1'b0}}, TOS_PTR};
-assign write_data1 = PC_address;
-assign write_data2 = (next_PC_sel[0])? JALR_target : JAL_target;
+assign write_data0 = (lbrReq[0])? ALU_result : {{(DATA_WIDTH-($clog2(LBR_SIZE))){1'b0}}, TOS_PTR};
+assign write_data1 = {{(DATA_WIDTH-ADDRESS_BITS){1'b0}}, PC_address};
+assign write_data2 = (next_PC_sel[0])? {{(DATA_WIDTH-ADDRESS_BITS){1'b0}}, JALR_target} : {{(DATA_WIDTH-ADDRESS_BITS){1'b0}}, JAL_target};
 
 lbrRegFile #(DATA_WIDTH, LBR_SIZE) lbrRegister(
     .clock(clock),

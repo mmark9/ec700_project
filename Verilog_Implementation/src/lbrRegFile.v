@@ -25,7 +25,7 @@
 // Assumptions: This Register File will be used in conjunction with the top module LBR.
 //              This top module should contain the appropriate logic that will prevent
 //              multiple writes to the same register in a single clock cycle.
-module lbrRegFile #(parameter DATA_WIDTH = 64, LBR_SIZE = 16) (
+module lbrRegFile #(parameter DATA_WIDTH = 32, LBR_SIZE = 16) (
                 clock, reset, read_sel,
                 wEn0, wEn1, wEn2,
                 write_sel0, write_sel1, write_sel2,
