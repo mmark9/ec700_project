@@ -1,5 +1,6 @@
-/** @module : memory
+/** @module : mem_lbr_stage
  *  @author : Adaptive & Secure Computing Systems (ASCS) Laboratory
+ *  @author : Michael Graziano
 
  *  Copyright (c) 2018 BRISC-V (ASCS/ECE/BU)
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,9 +21,11 @@
  *  THE SOFTWARE.
  */
 
-module memory_unit #(
+module mem_lbr_stage #(
     parameter CORE = 0,
     parameter DATA_WIDTH = 32,
+    parameter LBR_DATA_WIDTH = 64,
+    parameter LBR_SIZE = 16,
     parameter INDEX_BITS = 6,
     parameter OFFSET_BITS = 3,
     parameter ADDRESS_BITS = 20,
@@ -34,9 +37,14 @@ module memory_unit #(
     input stall,
     input load,
     input store,
-    input opSel,
+    input [1:0] opSel,
+    input [1:0] lbrReq,
+    input [1:0] next_PC_sel,
     input [ADDRESS_BITS-1:0] address,
     input [DATA_WIDTH-1:0] store_data,
+    input [DATA_WIDTH-1:0] RW_address,
+    input [DATA_WIDTH-1:0] PC_address,
+    input [DATA_WIDTH-1:0]
     input [DATA_WIDTH-1:0] ALU_Result,
     
     output [ADDRESS_BITS-1:0] data_addr,
