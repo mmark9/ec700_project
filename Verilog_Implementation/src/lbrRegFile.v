@@ -44,8 +44,12 @@ integer i;
 
 always @(posedge clock) begin
     if(reset==1)
-        for (i = 0; i < (1<<($clog2(LBR_SIZE)+2)); i=i+1) 
-        	register_file[i] <= 0; 
+        for (i = 0; i < (1<<($clog2(LBR_SIZE)+2)); i=i+1) begin
+                if (i == (1<<($clog2(LBR_SIZE)+1)))
+                    register_file[i] <= {($clog2(LBR_SIZE)){1'b1}};
+                else
+        	    register_file[i] <= 0; 
+    end
     else begin
         register_file[write_sel0] <= (wEn0)? write_data0 : register_file[write_sel0];
         register_file[write_sel1] <= (wEn1)? write_data1 : register_file[write_sel1];

@@ -33,19 +33,21 @@ input [DATA_WIDTH-1:0] RW_address, ALU_result, PC_address, JAL_target, JALR_targ
 output [DATA_WIDTH-1:0] output_data;
 
 wire wEn0, wEn1, wEn2;
+wire [($clog2(LBR_SIZE))-1:0] TOS_PTR;
 wire [($clog2(LBR_SIZE)+2)-1:0] read_sel, write_sel0, write_sel1, write_sel2;
 wire [DATA_WIDTH-1:0] write_data0, write_data1, write_data2;
 
 localparam [($clog2(LBR_SIZE)+2)-1:0] TOS_ADDR = 1<<(($clog2(LBR_SIZE)+2)-1);
 
 assign read_sel = (lbrReq[1])? RW_address[($clog2(LBR_SIZE)+2)-1:0] : TOS_ADDR;
+assign TOS_PTR = output_data[($clog2(LBR_SIZE))-1:0] + 1;
 assign wEn0 = lbrReq[0] ^ (~stall & next_PC_sel[1]);
 assign wEn1 = ~stall & next_PC_sel[1];
 assign wEn2 = wEn1;
 assign write_sel0 = read_sel;
-assign write_sel1 = {2'b00, output_data[$clog2(LBR_SIZE)-1:0]};
-assign write_sel2 = {2'b01, output_data[$clog2(LBR_SIZE)-1:0]};
-assign write_data0 = (lbrReq[0])? ALU_result : output_data + 1;
+assign write_sel1 = {2'b00, TOS_PTR};
+assign write_sel2 = {2'b01, TOS_PTR};
+assign write_data0 = (lbrReq[0])? ALU_result : {{(64-($clog2(LBR_SIZE))){1'b0}}, TOS_PTR};
 assign write_data1 = PC_address;
 assign write_data2 = (next_PC_sel[0])? JALR_target : JAL_target;
 
