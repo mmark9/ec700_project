@@ -28,12 +28,13 @@ module execute_pipe_unit #(parameter  DATA_WIDTH = 32,
     input clock, reset, stall,
     input [DATA_WIDTH-1:0]   ALU_result_execute,
     input [DATA_WIDTH-1:0]   store_data_execute,
-    input [DATA_WIDTH-1:0]   rs2_data_execute,
     input [ADDRESS_BITS-1:0] JAL_target_execute,
     input [ADDRESS_BITS-1:0] JALR_target_execute,
     input [ADDRESS_BITS-1:0] PC_execute,
     input [4:0] rd_execute,
     input [1:0] next_PC_select_execute,
+    input [1:0] memtoReg_execute,
+    input [1:0] lbrReq_execute,
     input memRead_execute,
     input memWrite_execute,
     input regWrite_execute,
@@ -41,12 +42,13 @@ module execute_pipe_unit #(parameter  DATA_WIDTH = 32,
 
     output [DATA_WIDTH-1:0]   ALU_result_memory,
     output [DATA_WIDTH-1:0]   store_data_memory,
-    output [DATA_WIDTH-1:0]   rs2_data_memory,
     output [ADDRESS_BITS-1:0] JAL_target_memory,
     output [ADDRESS_BITS-1:0] JALR_target_memory,
     output [ADDRESS_BITS-1:0] PC_memory,
     output [4:0] rd_memory,
     output [1:0] next_PC_select_memory,
+    output [1:0] memtoReg_memory,
+    output [1:0] lbrReq_memory,
     output memRead_memory,
     output memWrite_memory,
     output regWrite_memory,
@@ -57,7 +59,6 @@ localparam NOP = 32'h00000013;
 
 reg  [DATA_WIDTH-1:0]   ALU_result_execute_to_memory;
 reg  [DATA_WIDTH-1:0]   store_data_execute_to_memory;
-reg  [DATA_WIDTH-1:0]   rs2_data_execute_to_memory;
 reg  [ADDRESS_BITS-1:0] JAL_target_execute_to_memory;
 reg  [ADDRESS_BITS-1:0] JALR_target_execute_to_memory;
 reg  [ADDRESS_BITS-1:0] PC_execute_to_memory;
@@ -65,12 +66,13 @@ reg  [4:0] rd_execute_to_memory;
 reg  memRead_execute_to_memory;
 reg  memWrite_execute_to_memory;
 reg  [1:0] next_PC_select_execute_to_memory;
+reg  [1:0] memtoReg_execute_to_memory;
+reg  [1:0] lbrReq_execute_to_memory;
 reg  regWrite_execute_to_memory;
 reg  [DATA_WIDTH-1:0] instruction_execute_to_memory;
 
 assign ALU_result_memory      = ALU_result_execute_to_memory;
 assign store_data_memory      = store_data_execute_to_memory;
-assign rs2_data_memory        = rs2_data_execute_to_memory;
 assign JAL_target_memory      = JAL_target_execute_to_memory;
 assign JALR_target_memory     = JALR_target_execute_to_memory;
 assign PC_memory              = PC_execute_to_memory;
@@ -78,6 +80,8 @@ assign rd_memory              = rd_execute_to_memory;
 assign memRead_memory         = memRead_execute_to_memory;
 assign memWrite_memory        = memWrite_execute_to_memory;
 assign next_PC_select_memory  = next_PC_select_execute_to_memory;
+assign memtoReg_memory        = memtoReg_execute_to_memory;
+assign lbrReq_memory          = lbrReq_execute_to_memory;
 assign regWrite_memory        = regWrite_execute_to_memory;
 assign instruction_memory     = instruction_execute_to_memory;
 
@@ -85,7 +89,6 @@ always @(posedge clock) begin
    if(reset) begin
       ALU_result_execute_to_memory      <= {DATA_WIDTH{1'b0}};
       store_data_execute_to_memory      <= {DATA_WIDTH{1'b0}};
-      rs2_data_execute_to_memory        <= {DATA_WIDTH{1'b0}};
       JAL_target_execute_to_memory      <= {ADDRESS_BITS{1'b0}};
       JALR_target_execute_to_memory     <= {ADDRESS_BITS{1'b0}};
       PC_execute_to_memory              <= {ADDRESS_BITS{1'b0}};
@@ -93,6 +96,8 @@ always @(posedge clock) begin
       memRead_execute_to_memory         <= 1'b1;
       memWrite_execute_to_memory        <= 1'b0;
       next_PC_select_execute_to_memory  <= 2'b0;
+      memtoReg_execute_to_memory        <= 2'b0;
+      lbrReq_execute_to_memory          <= 2'b0;
       regWrite_execute_to_memory        <= 1'b0;
       instruction_execute_to_memory     <= NOP;
    end
@@ -100,7 +105,6 @@ always @(posedge clock) begin
       // flush all but PC_select (JAL/JALR/PC are all held at earlier stages
       ALU_result_execute_to_memory      <= ALU_result_execute;
       store_data_execute_to_memory      <= store_data_execute;
-      rs2_data_execute_to_memory        <= rs2_data_execute;
       JAL_target_execute_to_memory      <= JAL_target_execute;
       JALR_target_execute_to_memory     <= JALR_target_execute;
       PC_execute_to_memory              <= PC_execute;
@@ -108,13 +112,14 @@ always @(posedge clock) begin
       memRead_execute_to_memory         <= memRead_execute;
       memWrite_execute_to_memory        <= memWrite_execute;
       next_PC_select_execute_to_memory  <= next_PC_select_execute_to_memory; // hold during stall
+      memtoReg_execute_to_memory        <= memtoReg_execute;
+      lbrReq_execute_to_memory          <= lbrReq_execute;
       regWrite_execute_to_memory        <= regWrite_execute;
       instruction_execute_to_memory     <= instruction_execute;
    end
    else begin
       ALU_result_execute_to_memory      <= ALU_result_execute;
       store_data_execute_to_memory      <= store_data_execute;
-      rs2_data_execute_to_memory        <= rs2_data_execute;
       JAL_target_execute_to_memory      <= JAL_target_execute;
       JALR_target_execute_to_memory     <= JALR_target_execute;
       PC_execute_to_memory              <= PC_execute;
@@ -122,6 +127,8 @@ always @(posedge clock) begin
       memRead_execute_to_memory         <= memRead_execute;
       memWrite_execute_to_memory        <= memWrite_execute;
       next_PC_select_execute_to_memory  <= next_PC_select_execute;
+      memtoReg_execute_to_memory        <= memtoReg_execute;
+      lbrReq_execute_to_memory          <= lbrReq_execute;
       regWrite_execute_to_memory        <= regWrite_execute;
       instruction_execute_to_memory     <= instruction_execute;
    end

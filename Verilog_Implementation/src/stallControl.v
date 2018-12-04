@@ -1,4 +1,5 @@
 /*  @author : Adaptive & Secure Computing Systems (ASCS) Laboratory
+ *  @author : Michael Graziano
 
  *  Copyright (c) 2018 BRISC-V (ASCS/ECE/BU)
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -53,13 +54,15 @@ wire rs2_hazard_memory;
 wire rs2_hazard_writeback;
 wire load_opcode_in_execute;
 
-localparam [6:0] LOAD = 7'b0000011;
+localparam [6:0] LOAD  = 7'b0000011,
+                 RDLBR = 7'b0001011;
 
 // Detect hazards between decode and other stages
-assign load_opcode_in_execute = (opcode_execute == LOAD) ? 1'b1 : 1'b0; 
-assign rs1_hazard_execute     = (rs1 == rd_execute   ) &  regwrite_execute  ;
-assign rs1_hazard_memory      = (rs1 == rd_memory    ) &  regwrite_memory   ;
-assign rs1_hazard_writeback   = (rs1 == rd_writeback ) &  regwrite_writeback;
+assign load_opcode_in_execute  = (opcode_execute == LOAD) ? 1'b1  : 1'b0;
+assign rdlbr_opcode_in_execute = (opcode_execute == RDLBR) ? 1'b1 : 1'b0;
+assign rs1_hazard_execute      = (rs1 == rd_execute   ) &  regwrite_execute  ;
+assign rs1_hazard_memory       = (rs1 == rd_memory    ) &  regwrite_memory   ;
+assign rs1_hazard_writeback    = (rs1 == rd_writeback ) &  regwrite_writeback;
 
 assign rs2_hazard_execute     = (rs2 == rd_execute   ) &  regwrite_execute  ;
 assign rs2_hazard_memory      = (rs2 == rd_memory    ) &  regwrite_memory   ;
@@ -68,11 +71,11 @@ assign rs2_hazard_writeback   = (rs2 == rd_writeback ) &  regwrite_writeback;
 // TODO: Add read enable to detect true reads. Not every instruction reads
 // both registers.
 assign rs1_stall_detected =   (rs1_hazard_execute     &
-                               load_opcode_in_execute &
+                               (load_opcode_in_execute | rdlbr_opcode_in_execute) &
                                (rs1 != 5'd0)          );
                                
 assign rs2_stall_detected =   (rs2_hazard_execute     &
-                               load_opcode_in_execute &
+                               (load_opcode_in_execute | rdlbr_opcode_in_execute) &
                                (rs2 != 5'd0)          );                               
 
 //stall on a loadword and rd overlap

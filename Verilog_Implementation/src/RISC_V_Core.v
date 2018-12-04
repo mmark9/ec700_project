@@ -1,5 +1,6 @@
 /** @module : RISC_V_Core
  *  @author : Adaptive & Secure Computing Systems (ASCS) Laboratory
+ *  @author : Michael Graziano
  
  *  Copyright (c) 2018 BRISC-V (ASCS/ECE/BU)
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,12 +25,13 @@
 module RISC_V_Core #(
     parameter CORE = 0,
     parameter DATA_WIDTH = 32,
+    parameter LBR_SIZE = 16,
     parameter INDEX_BITS = 6,
     parameter OFFSET_BITS = 3,
     parameter ADDRESS_BITS = 12,
     parameter PRINT_CYCLES_MIN = 0,
     parameter PRINT_CYCLES_MAX = 15,
-    parameter PROGRAM = "../software/applications/binaries/mandelbrot.vmh"
+    parameter PROGRAM = "../software/applications/binaries/gcd.vmh"
 ) (
     input clock,
 
@@ -73,7 +75,9 @@ wire [4:0] rs2_decode;
 wire stall;
 wire [ADDRESS_BITS-1: 0] JAL_target_decode;
 wire [ADDRESS_BITS-1: 0] JAL_target_execute;
+wire [ADDRESS_BITS-1: 0] JAL_target_memory;
 wire [ADDRESS_BITS-1: 0] JALR_target_execute;
+wire [ADDRESS_BITS-1: 0] JALR_target_memory;
 wire [ADDRESS_BITS-1: 0] branch_target_decode;
 wire [ADDRESS_BITS-1: 0] branch_target_execute;
 
@@ -94,18 +98,17 @@ wire [DATA_WIDTH-1:0]  rs2_data_memory;
 wire [4:0]   rd_execute;
 
 wire [ADDRESS_BITS-1: 0] PC_execute;
+wire [ADDRESS_BITS-1: 0] PC_memory;
 wire [6:0]  opcode_execute;
 wire [6:0]  funct7_execute;
 wire [2:0]  funct3_execute;
 
 wire memRead_decode;
 wire memRead_execute;
-
 wire memRead_memory;
 wire memRead_writeback;
-wire [4:0]  rd_memory;
-wire [4:0]  rd_writeback;
-wire memtoReg;
+wire [4:0] rd_memory;
+wire [4:0] rd_writeback;
 wire [2:0] ALUOp_decode;
 wire [2:0] ALUOp_execute;
 wire branch_op_decode;
@@ -129,6 +132,14 @@ wire regWrite_execute;
 wire regWrite_memory;
 wire regWrite_writeback;
 
+wire [1:0] memtoReg_decode;
+wire [1:0] memtoReg_execute;
+wire [1:0] memtoReg_memory;
+wire [1:0] memtoReg_writeback;
+wire [1:0] lbrReq_decode;
+wire [1:0] lbrReq_execute;
+wire [1:0] lbrReq_memory;
+
 wire branch_execute;
 wire [DATA_WIDTH-1:0]   ALU_result_execute;
 wire [DATA_WIDTH-1:0]   ALU_result_memory;
@@ -139,6 +150,8 @@ wire zero; // Have not done anything with this signal
 
 wire [DATA_WIDTH-1:0]    memory_data_memory;
 wire [DATA_WIDTH-1:0]    memory_data_writeback;
+wire [DATA_WIDTH-1:0]    lbr_data_memory;
+wire [DATA_WIDTH-1:0]    lbr_data_writeback;
 wire [DATA_WIDTH-1:0]    bypass_data_memory;
 wire [ADDRESS_BITS-1: 0] memory_addr; // To use to check the address coming out the memory stage
 wire [1:0] rs1_data_bypass;
@@ -236,7 +249,8 @@ control_unit #(CORE, PRINT_CYCLES_MIN, PRINT_CYCLES_MAX ) CU (
         .opcode(opcode_decode),
         .branch_op(branch_op_decode),
         .memRead(memRead_decode),
-        .memtoReg(memtoReg),
+        .lbrReq(lbrReq_decode),
+        .memtoReg(memtoReg_decode),
         .ALUOp(ALUOp_decode),
         .memWrite(memWrite_decode),
         .next_PC_sel(next_PC_select_decode),
@@ -265,6 +279,8 @@ decode_pipe_unit #(DATA_WIDTH, ADDRESS_BITS) ID_EU(
         .branch_op_decode(branch_op_decode),
         .memRead_decode(memRead_decode),
         .ALUOp_decode(ALUOp_decode),
+        .lbrReq_decode(lbrReq_decode),
+        .memtoReg_decode(memtoReg_decode),
         .memWrite_decode(memWrite_decode),
         .next_PC_select_decode(next_PC_select_decode),
         .next_PC_select_memory(next_PC_select_memory),
@@ -287,6 +303,8 @@ decode_pipe_unit #(DATA_WIDTH, ADDRESS_BITS) ID_EU(
         .branch_op_execute(branch_op_execute),
         .memRead_execute(memRead_execute),
         .ALUOp_execute(ALUOp_execute),
+        .lbrReq_execute(lbrReq_execute),
+        .memtoReg_execute(memtoReg_execute),
         .memWrite_execute(memWrite_execute),
         .next_PC_select_execute(next_PC_select_execute),
         .operand_A_sel_execute(operand_A_sel_execute),
@@ -328,26 +346,36 @@ execute_pipe_unit #(DATA_WIDTH, ADDRESS_BITS) EU_MU (
         .stall(stall),
         .ALU_result_execute(ALU_result_execute),
         .store_data_execute(rs2_data_execute),
+        .JAL_target_execute(JAL_target_execute),
+        .JALR_target_execute(JALR_target_execute),
+        .PC_execute(PC_execute),
         .rd_execute(rd_execute),
         .memWrite_execute(memWrite_execute),
         .memRead_execute(memRead_execute),
         .next_PC_select_execute(next_PC_select_execute),
+        .memtoReg_execute(memtoReg_execute),
+        .lbrReq_execute(lbrReq_execute),
         .regWrite_execute(regWrite_execute),
         // For Debug
         .instruction_execute(instruction_execute),
 
         .ALU_result_memory(ALU_result_memory),
         .store_data_memory(rs2_data_memory),
+        .JAL_target_memory(JAL_target_memory),
+        .JALR_target_memory(JALR_target_memory),
+        .PC_memory(PC_memory),
         .rd_memory(rd_memory),
         .memWrite_memory(memWrite_memory),
         .memRead_memory(memRead_memory),
         .next_PC_select_memory(next_PC_select_memory),
+	.memtoReg_memory(memtoReg_memory),
+        .lbrReq_memory(lbrReq_memory),
         .regWrite_memory(regWrite_memory),
         // For Debug
         .instruction_memory(instruction_memory)
 );
 
-memory_unit #(CORE, DATA_WIDTH, INDEX_BITS, OFFSET_BITS, ADDRESS_BITS,
+mem_lbr_stage #(CORE, DATA_WIDTH, LBR_SIZE, INDEX_BITS, OFFSET_BITS, ADDRESS_BITS,
               PRINT_CYCLES_MIN, PRINT_CYCLES_MAX ) MU (
         .clock(clock),
         .reset(reset),
@@ -355,12 +383,19 @@ memory_unit #(CORE, DATA_WIDTH, INDEX_BITS, OFFSET_BITS, ADDRESS_BITS,
 
         .load(memRead_memory),
         .store(memWrite_memory),
-        .opSel(memRead_memory),
+        .opSel(memtoReg_memory),
+        .lbrReq(lbrReq_memory),
+        .next_PC_sel(next_PC_select_memory),
         .address(generated_addr),
+	.PC_address(PC_memory),
+        .JAL_target(JAL_target_memory),
+        .JALR_target(JALR_target_memory),
         .store_data(rs2_data_memory),
+	.RW_address(rs2_data_memory),
         .ALU_Result(ALU_result_memory),
         .data_addr(memory_addr),
         .load_data(memory_data_memory),
+        .lbr_data(lbr_data_memory),
         .bypass_data(bypass_data_memory),
         .valid(d_valid),
         .ready(d_ready),
@@ -374,16 +409,18 @@ memory_pipe_unit #(DATA_WIDTH, ADDRESS_BITS) MU_WB (
 
          .ALU_result_memory(ALU_result_memory),
          .load_data_memory(memory_data_memory),
+         .lbr_data_memory(lbr_data_memory),
          .opwrite_memory(regWrite_memory),
-         .opsel_memory(memRead_memory),
+         .opsel_memory(memtoReg_memory),
          .opReg_memory(rd_memory),
          // For Debug
          .instruction_memory(instruction_memory),
 
          .ALU_result_writeback(ALU_result_writeback),
          .load_data_writeback(memory_data_writeback),
+         .lbr_data_writeback(lbr_data_writeback),
          .opwrite_writeback(regWrite_writeback),
-         .opsel_writeback(memRead_writeback),
+         .opsel_writeback(memtoReg_writeback),
          .opReg_writeback(rd_writeback),
          // For Debug
          .instruction_writeback(instruction_writeback)
@@ -396,10 +433,11 @@ writeback_unit #(CORE, DATA_WIDTH, PRINT_CYCLES_MIN, PRINT_CYCLES_MAX) WB (
         .stall(stall),
 
         .opWrite(regWrite_writeback),
-        .opSel(memRead_writeback),
+        .opSel(memtoReg_writeback),
         .opReg(rd_writeback),
         .ALU_Result(ALU_result_writeback),
         .memory_data(memory_data_writeback),
+        .LBR_data(lbr_data_writeback),
         .write(write_writeback),
         .write_reg(write_reg_writeback),
         .write_data(write_data_writeback),

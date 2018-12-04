@@ -37,20 +37,19 @@ wire [31:0] to_peripheral_data;
 wire        to_peripheral_valid;
 
 
-// module RISC_V_Core #(parameter CORE = 0, DATA_WIDTH = 32, INDEX_BITS = 6, OFFSET_BITS = 3, ADDRESS_BITS = 20)
-RISC_V_Core CORE (
+// RISC_V_Core #(0, 32, 16, 6, 3, 20, 0, 15) CORE (
+RISC_V_Core CORE(
 		  .clock(clock), 
 		  .reset(reset), 
 		  .start(start), 
 		  .stall_in(stall),
 		  .prog_address(prog_address),	
 		  .from_peripheral(from_peripheral),
-       	  .from_peripheral_data(from_peripheral_data),
-          .from_peripheral_valid(from_peripheral_valid),
-          .to_peripheral(to_peripheral),
+       	          .from_peripheral_data(from_peripheral_data),
+                  .from_peripheral_valid(from_peripheral_valid),
+                  .to_peripheral(to_peripheral),
 		  .to_peripheral_data(to_peripheral_data),
 		  .to_peripheral_valid(to_peripheral_valid),
-
 		  .report(report),
 		  .current_PC()
 ); 

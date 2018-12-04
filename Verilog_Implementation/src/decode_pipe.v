@@ -39,6 +39,7 @@ module decode_pipe_unit #(parameter  DATA_WIDTH = 32,
     input memRead_decode,
     input [2:0] ALUOp_decode,
     input [1:0] lbrReq_decode,
+    input [1:0] memtoReg_decode,
     input memWrite_decode,
     input [1:0] next_PC_select_decode,
     input [1:0] next_PC_select_memory,
@@ -61,6 +62,7 @@ module decode_pipe_unit #(parameter  DATA_WIDTH = 32,
     output memRead_execute,
     output [2:0] ALUOp_execute,
     output [1:0] lbrReq_execute,
+    output [1:0] memtoReg_execute,
     output memWrite_execute,
     output [1:0] next_PC_select_execute,
     output [1:0] operand_A_sel_execute,
@@ -85,6 +87,7 @@ reg branch_op_decode_to_execute;
 reg memRead_decode_to_execute;
 reg [2:0] ALUOp_decode_to_execute;
 reg [1:0] lbrReq_decode_to_execute;
+reg [1:0] memtoReg_decode_to_execute;
 reg memWrite_decode_to_execute;
 reg [1:0] next_PC_select_decode_to_execute;
 reg [1:0] operand_A_sel_decode_to_execute;
@@ -107,6 +110,7 @@ assign  branch_op_execute      = branch_op_decode_to_execute;
 assign  memRead_execute        = memRead_decode_to_execute;
 assign  ALUOp_execute          = ALUOp_decode_to_execute;
 assign  lbrReq_execute         = lbrReq_decode_to_execute;
+assign  memtoReg_execute       = memtoReg_decode_to_execute;
 assign  memWrite_execute       = memWrite_decode_to_execute;
 assign  next_PC_select_execute = next_PC_select_decode_to_execute;
 assign  operand_A_sel_execute  = operand_A_sel_decode_to_execute;
@@ -130,6 +134,7 @@ always @(posedge clock) begin
         memRead_decode_to_execute        <= 1'b0;
         ALUOp_decode_to_execute          <= 3'b0;
         lbrReq_decode_to_execute         <= 2'b0;
+        memtoReg_decode_to_execute       <= 2'b0;
         memWrite_decode_to_execute       <= 1'b0;
         next_PC_select_decode_to_execute <= 2'b0;
         operand_A_sel_decode_to_execute  <= 2'b0;
@@ -151,6 +156,7 @@ always @(posedge clock) begin
          memRead_decode_to_execute        <= 1'b0;
          ALUOp_decode_to_execute          <= 3'd1; // I type
          lbrReq_decode_to_execute         <= 2'b0;
+         memtoReg_decode_to_execute       <= 2'b0;
          memWrite_decode_to_execute       <= 1'b0;
          next_PC_select_decode_to_execute <= next_PC_select_execute; // hold PC select
          operand_A_sel_decode_to_execute  <= 2'd0;
@@ -174,6 +180,7 @@ always @(posedge clock) begin
          memRead_decode_to_execute        <= 1'b0;
          ALUOp_decode_to_execute          <= 3'd1; // I type
          lbrReq_decode_to_execute         <= 2'b0;
+         memtoReg_decode_to_execute       <= 2'b0;
          memWrite_decode_to_execute       <= 1'b0;
          next_PC_select_decode_to_execute <= 2'd0;
          operand_A_sel_decode_to_execute  <= 2'd0;
@@ -196,6 +203,7 @@ always @(posedge clock) begin
         memRead_decode_to_execute        <= memRead_decode;
         ALUOp_decode_to_execute          <= ALUOp_decode;
         lbrReq_decode_to_execute         <= lbrReq_decode;
+        memtoReg_decode_to_execute       <= memtoReg_decode;
         memWrite_decode_to_execute       <= memWrite_decode;
         next_PC_select_decode_to_execute <= next_PC_select_decode;
         operand_A_sel_decode_to_execute  <= operand_A_sel_decode;

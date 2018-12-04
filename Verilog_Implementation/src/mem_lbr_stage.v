@@ -71,7 +71,7 @@ LBR_unit #(
     .PC_address(PC_address),
     .JAL_target(JAL_target),
     .JALR_target(JALR_target),
-    .output_data(output_data)
+    .output_data(lbr_data)
 );
 
 d_mem_interface #(
