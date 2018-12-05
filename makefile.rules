@@ -86,6 +86,9 @@ SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
 LBR_SIMULATOR_OBJ_LIST=$(OBJDIR)lbr_simulator$(OBJ_SUFFIX)\
 		$(OBJDIR)lbr$(OBJ_SUFFIX)
 
+KBOUNCER_SIMULATOR_OBJ_LIST=$(OBJDIR)kbouncer_simulator$(OBJ_SUFFIX)\
+                $(OBJDIR)lbr$(OBJ_SUFFIX)
+
 $(OBJDIR): 
 	mkdir -p $@
 
@@ -97,6 +100,14 @@ $(OBJDIR)lbr$(OBJ_SUFFIX): lbr.cpp
 $(OBJDIR)lbr_simulator$(OBJ_SUFFIX): lbr_simulator.cpp
 	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
 
-# lbr_simulator .so
+# kbouncer_simulator object
+$(OBJDIR)kbouncer_simulator$(OBJ_SUFFIX): kbouncer_simulator.cpp
+	$(CXX) $(TOOL_CXXFLAGS) $(COMP_OBJ)$@ $<
+
+# lbr_simulator.so
 $(OBJDIR)lbr_simulator$(PINTOOL_SUFFIX): $(LBR_SIMULATOR_OBJ_LIST)
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
+
+# kbouncer_simulator.so
+$(OBJDIR)kbouncer_simulator$(PINTOOL_SUFFIX): $(KBOUNCER_SIMULATOR_OBJ_LIST)
 	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
