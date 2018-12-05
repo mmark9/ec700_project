@@ -25,6 +25,8 @@ LBR* lbr_instance = NULL;
 time_t start_time;
 time_t end_time;
 
+bool is_32_bit_app = false;
+
 KNOB<string> enable_checks_flag_arg(
 		KNOB_MODE_WRITEONCE,
 		"pintool",
@@ -52,6 +54,13 @@ KNOB<string> lbr_size_arg(
 		"lbr_size",
 		"16",
 		"Size of LBR stack (default: 16)");
+
+KNOB<string> arch_32_enabled_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"32bit_mode",
+		"false",
+		"Use for 32 bit applications (default: false)");
 
 
 /**
@@ -110,8 +119,13 @@ VOID PrintInstUntilIndirectJump(const VOID* pc) {
 	size_t operand_count = 0;
 	bool is_memory_read = false;
 	size_t inst_count = 0;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)pc;
 	while(true) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -209,8 +223,13 @@ size_t GetNumberOfInstructionsBetween(VOID* branch, VOID* target) {
 	size_t inst_length = 0;
 	xed_state_t dstate;
 	size_t ins_count = 0;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)branch;
 	while(pc_from_ptr <= (ADDRINT)target) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -243,8 +262,13 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* jmp_addr) {
 	size_t inst_count = 0;
 	size_t operand_count = 0;
 	bool is_memory_read = false;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)start_addr;
 	while(true) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -291,8 +315,13 @@ bool IsReturnInstruction(VOID* pc) {
 	xed_error_enum_t ret_code;
 	xed_uint64_t runtime_addr;
 	xed_state_t dstate;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
 	PIN_SafeCopy(inst_bytes, pc, XED_MAX_INSTRUCTION_BYTES);
 	ret_code = xed_decode(&xed_inst, inst_bytes, XED_MAX_INSTRUCTION_BYTES);
@@ -461,6 +490,12 @@ int main(int argc, char *argv[]) {
     std::string ins_limit_str = ins_limit_arg.Value();
     std::string chain_limit_str = chain_limit_arg.Value();
     std::string lbr_size_str = lbr_size_arg.Value();
+    std::string arch_32_enabled_str = arch_32_enabled_arg.Value();
+    if(strcasecmp(arch_32_enabled_str.c_str(), "true") == 0) {
+    	is_32_bit_app = true;
+    } else {
+    	is_32_bit_app = false;
+    }
     if(strcasecmp(enable_checks_str.c_str(), "true") == 0) {
     	kbouncer_checks_enabled = true;
     } else {
