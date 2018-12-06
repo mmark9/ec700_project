@@ -506,11 +506,13 @@ int main(int argc, char *argv[]) {
     		"\tKbouncer checks enabled: %s\n"
     		"\tLBR stack size: %lu\n"
 			"\tMax gadget instruction length: %lu\n"
-			"\tMin consecutive gadget chain length: %lu\n",
+			"\tMin consecutive gadget chain length: %lu\n"
+			"\t32 bit mode enabled: %s\n",
 			kbouncer_checks_enabled ? "YES" : "NO",
 			lbr_stack_size,
 			GADGET_INS_LENGTH_THRESHOLD,
-			GADGET_CHAIN_LENGTH_THRESHOLD);
+			GADGET_CHAIN_LENGTH_THRESHOLD,
+			is_32_bit_app ? "YES" : "NO");
     PIN_InitSymbols();
     xed_tables_init();
     lbr_instance = new LBR(lbr_stack_size);
