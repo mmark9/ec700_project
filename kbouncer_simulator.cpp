@@ -88,13 +88,7 @@ bool IsControlFlowTransferInstruction(const char* inst_buf) {
 	// since only jumps have j in their opcode string
 	if(strstr(inst_buf, "ret")
 			|| strstr(inst_buf, "j")
-			|| strstr(inst_buf, "call")
-			|| strstr(inst_buf, "enter")
-			|| strstr(inst_buf, "int")
-			|| strstr(inst_buf, "into")
-			|| strstr(inst_buf, "lcall")
-			|| strstr(inst_buf, "loop")
-			|| strstr(inst_buf, "bound")) {
+			|| strstr(inst_buf, "call")) {
 		return true;
 	} else {
 		return false;
