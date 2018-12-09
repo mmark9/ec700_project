@@ -110,8 +110,10 @@ VOID PrintInstUntilIndirectJump(const VOID* pc) {
 	size_t operand_count = 0;
 	bool is_memory_read = false;
 	size_t inst_count = 0;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+//	dstate.mmode = XED_MACHINE_MODE_LONG_64;
+//	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+    dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+    dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
 	ADDRINT pc_from_ptr = (ADDRINT)pc;
 	while(true) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
