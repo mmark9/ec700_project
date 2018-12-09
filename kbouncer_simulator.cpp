@@ -437,10 +437,10 @@ bool IllegalReturnsFoundInLBR(const LBR* lbr) {
 		if(IsReturnInstruction(lbr->GetSrcAt(i)) &&
 				!IsCallPrecededInstruction(lbr->GetDstAt(i))) {
 			illegal_ret_found = true;
-			fprintf(stdout,
+			/*fprintf(stdout,
 					"Illegal ret %p -->  target %p\n",
-					lbr->GetSrcAt(i), lbr->GetDstAt(i));
-			PrintInstUntilIndirectJump(lbr->GetDstAt(i));
+					lbr->GetSrcAt(i), lbr->GetDstAt(i));*/
+			//PrintInstUntilIndirectJump(lbr->GetDstAt(i));
 		}
 	}
 	return illegal_ret_found;
@@ -450,14 +450,17 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 		SYSCALL_STANDARD std, VOID* v) {
 	// We do as LBR walk to verify integrity of control flow
 	if(!kbouncer_checks_enabled) return;
+	PIN_REGISTER pin_register;
+	PIN_GetContextRegval(ctxt, REG_INST_PTR, reinterpret_cast<UINT8*>(&pin_register));
 	fprintf(stdout,
-			"\n[ Printing ROP diagnostics prior to syscall(%lu) ]\n\n",
-			PIN_GetSyscallNumber(ctxt, std));
+			"\n[ Printing ROP diagnostics prior to syscall(%lu) ip: %p ]\n\n",
+			PIN_GetSyscallNumber(ctxt, std), (void*)pin_register.qword);
 	PrintLbrStack(lbr_instance);
 	size_t chain_length = GetLongestDetectedGadgetSeqCount(lbr_instance);
 	if(IllegalReturnsFoundInLBR(lbr_instance)) {
 		fprintf(stdout, "ROP detected: Illegal return instruction found!\n");
-	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
+	}
+	if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
 		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
 	}
 }
