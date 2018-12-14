@@ -27,7 +27,7 @@ module BSRAM #(
     parameter CORE = 0,
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 8,
-    parameter INIT_FILE = "../software/applications/binaries/zeros4096.dat",   //  memory needs to be prefilled with zeros
+    parameter INIT_FILE = "./software/applications/binaries/zeros4096.dat",   //  memory needs to be prefilled with zeros
     parameter PRINT_CYCLES_MIN = 1,
     parameter PRINT_CYCLES_MAX = 1000
 ) (

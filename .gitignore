@@ -47,4 +47,5 @@
 *.v.bak
 *.wlf
 Verilog_Implementation/BRISC-V_Work
-software/
+Verilog_Implementation/*.png
+Verilog_Implementation/software

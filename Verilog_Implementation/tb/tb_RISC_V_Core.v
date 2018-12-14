@@ -36,6 +36,9 @@ wire [1:0]  to_peripheral;
 wire [31:0] to_peripheral_data;
 wire        to_peripheral_valid;
 
+reg [19:0] isp_address;
+reg [31:0] isp_data;
+reg isp_write;
 
 // RISC_V_Core #(0, 32, 16, 6, 3, 20, 0, 15) CORE (
 RISC_V_Core CORE(
@@ -50,6 +53,9 @@ RISC_V_Core CORE(
                   .to_peripheral(to_peripheral),
 		  .to_peripheral_data(to_peripheral_data),
 		  .to_peripheral_valid(to_peripheral_valid),
+		  .isp_address(isp_address),
+		  .isp_data(isp_data),
+		  .isp_write(isp_write),
 		  .report(report),
 		  .current_PC()
 ); 
@@ -57,21 +63,26 @@ RISC_V_Core CORE(
     // Clock generator
     always #1 clock = ~clock;
 
-    initial begin
-          clock  = 0;
-          reset  = 1;
-          report = 1; 
-          stall  = 0;
-          prog_address = 'h0;
-          repeat (1) @ (posedge clock);
-          
-          #1reset = 0;
-          start = 1; 
-          stall = 0;
-          repeat (1) @ (posedge clock);
-          
-          start = 0; 
-          repeat (1) @ (posedge clock);        
-     end
-     
+    initial begin
+          $readmemh("./software/applications/binaries/zeros32.dat", CORE.ID.registers.register_file);  
+	
+          clock  = 0;
+          reset  = 1;
+          report = 1; 
+          stall  = 0;
+          isp_address = 0;
+          isp_data = 0;
+          isp_write = 0;
+          prog_address = 'h0;
+          repeat (10) @ (posedge clock);
+          
+          #1 reset = 0;
+          start = 1; 
+          stall = 0;
+          repeat (1) @ (posedge clock);
+          
+          start = 0; 
+          repeat (1) @ (posedge clock);        
+     end
+     
 endmodule

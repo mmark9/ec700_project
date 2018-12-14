@@ -31,7 +31,7 @@ module RISC_V_Core #(
     parameter ADDRESS_BITS = 12,
     parameter PRINT_CYCLES_MIN = 0,
     parameter PRINT_CYCLES_MAX = 15,
-    parameter PROGRAM = "../software/applications/binaries/gcd.vmh"
+    parameter PROGRAM = "./software/applications/binaries/gcd.vmh"
 ) (
     input clock,
 
