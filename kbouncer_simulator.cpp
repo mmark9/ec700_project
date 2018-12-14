@@ -25,6 +25,8 @@ LBR* lbr_instance = NULL;
 time_t start_time;
 time_t end_time;
 
+bool is_32_bit_app = false;
+
 KNOB<string> enable_checks_flag_arg(
 		KNOB_MODE_WRITEONCE,
 		"pintool",
@@ -53,6 +55,13 @@ KNOB<string> lbr_size_arg(
 		"16",
 		"Size of LBR stack (default: 16)");
 
+KNOB<string> arch_32_enabled_arg(
+		KNOB_MODE_WRITEONCE,
+		"pintool",
+		"32bit_mode",
+		"false",
+		"Use for 32 bit applications (default: false)");
+
 
 /**
  * Credit for original logic
@@ -79,13 +88,7 @@ bool IsControlFlowTransferInstruction(const char* inst_buf) {
 	// since only jumps have j in their opcode string
 	if(strstr(inst_buf, "ret")
 			|| strstr(inst_buf, "j")
-			|| strstr(inst_buf, "call")
-			|| strstr(inst_buf, "enter")
-			|| strstr(inst_buf, "int")
-			|| strstr(inst_buf, "into")
-			|| strstr(inst_buf, "lcall")
-			|| strstr(inst_buf, "loop")
-			|| strstr(inst_buf, "bound")) {
+			|| strstr(inst_buf, "call")) {
 		return true;
 	} else {
 		return false;
@@ -110,10 +113,13 @@ VOID PrintInstUntilIndirectJump(const VOID* pc) {
 	size_t operand_count = 0;
 	bool is_memory_read = false;
 	size_t inst_count = 0;
-//	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-//	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
-    dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
-    dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)pc;
 	while(true) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -211,8 +217,13 @@ size_t GetNumberOfInstructionsBetween(VOID* branch, VOID* target) {
 	size_t inst_length = 0;
 	xed_state_t dstate;
 	size_t ins_count = 0;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)branch;
 	while(pc_from_ptr <= (ADDRINT)target) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -245,8 +256,13 @@ bool PrecedesIndirectJumpWithinThreshold(VOID* start_addr, VOID* jmp_addr) {
 	size_t inst_count = 0;
 	size_t operand_count = 0;
 	bool is_memory_read = false;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	ADDRINT pc_from_ptr = (ADDRINT)start_addr;
 	while(true) {
 		xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
@@ -293,8 +309,13 @@ bool IsReturnInstruction(VOID* pc) {
 	xed_error_enum_t ret_code;
 	xed_uint64_t runtime_addr;
 	xed_state_t dstate;
-	dstate.mmode = XED_MACHINE_MODE_LONG_64;
-	dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	if(is_32_bit_app) {
+		dstate.mmode = XED_MACHINE_MODE_LEGACY_32;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_32b;
+	} else {
+		dstate.mmode = XED_MACHINE_MODE_LONG_64;
+		dstate.stack_addr_width = XED_ADDRESS_WIDTH_64b;
+	}
 	xed_decoded_inst_zero_set_mode(&xed_inst, &dstate);
 	PIN_SafeCopy(inst_bytes, pc, XED_MAX_INSTRUCTION_BYTES);
 	ret_code = xed_decode(&xed_inst, inst_bytes, XED_MAX_INSTRUCTION_BYTES);
@@ -416,10 +437,10 @@ bool IllegalReturnsFoundInLBR(const LBR* lbr) {
 		if(IsReturnInstruction(lbr->GetSrcAt(i)) &&
 				!IsCallPrecededInstruction(lbr->GetDstAt(i))) {
 			illegal_ret_found = true;
-			fprintf(stdout,
+			/*fprintf(stdout,
 					"Illegal ret %p -->  target %p\n",
-					lbr->GetSrcAt(i), lbr->GetDstAt(i));
-			PrintInstUntilIndirectJump(lbr->GetDstAt(i));
+					lbr->GetSrcAt(i), lbr->GetDstAt(i));*/
+			//PrintInstUntilIndirectJump(lbr->GetDstAt(i));
 		}
 	}
 	return illegal_ret_found;
@@ -429,14 +450,17 @@ VOID CheckForRopBeforeSysCall(THREADID thread_index, CONTEXT* ctxt,
 		SYSCALL_STANDARD std, VOID* v) {
 	// We do as LBR walk to verify integrity of control flow
 	if(!kbouncer_checks_enabled) return;
+	PIN_REGISTER pin_register;
+	PIN_GetContextRegval(ctxt, REG_INST_PTR, reinterpret_cast<UINT8*>(&pin_register));
 	fprintf(stdout,
-			"\n[ Printing ROP diagnostics prior to syscall(%lu) ]\n\n",
-			PIN_GetSyscallNumber(ctxt, std));
+			"\n[ Printing ROP diagnostics prior to syscall(%lu) ip: %p ]\n\n",
+			PIN_GetSyscallNumber(ctxt, std), (void*)pin_register.qword);
 	PrintLbrStack(lbr_instance);
 	size_t chain_length = GetLongestDetectedGadgetSeqCount(lbr_instance);
 	if(IllegalReturnsFoundInLBR(lbr_instance)) {
 		fprintf(stdout, "ROP detected: Illegal return instruction found!\n");
-	} else if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
+	}
+	if(chain_length >= GADGET_CHAIN_LENGTH_THRESHOLD) {
 		fprintf(stdout, "ROP detected: gadget chain of length %lu detected\n", chain_length);
 	}
 }
@@ -463,6 +487,12 @@ int main(int argc, char *argv[]) {
     std::string ins_limit_str = ins_limit_arg.Value();
     std::string chain_limit_str = chain_limit_arg.Value();
     std::string lbr_size_str = lbr_size_arg.Value();
+    std::string arch_32_enabled_str = arch_32_enabled_arg.Value();
+    if(strcasecmp(arch_32_enabled_str.c_str(), "true") == 0) {
+    	is_32_bit_app = true;
+    } else {
+    	is_32_bit_app = false;
+    }
     if(strcasecmp(enable_checks_str.c_str(), "true") == 0) {
     	kbouncer_checks_enabled = true;
     } else {
@@ -479,11 +509,13 @@ int main(int argc, char *argv[]) {
     		"\tKbouncer checks enabled: %s\n"
     		"\tLBR stack size: %lu\n"
 			"\tMax gadget instruction length: %lu\n"
-			"\tMin consecutive gadget chain length: %lu\n",
+			"\tMin consecutive gadget chain length: %lu\n"
+			"\t32 bit mode enabled: %s\n",
 			kbouncer_checks_enabled ? "YES" : "NO",
 			lbr_stack_size,
 			GADGET_INS_LENGTH_THRESHOLD,
-			GADGET_CHAIN_LENGTH_THRESHOLD);
+			GADGET_CHAIN_LENGTH_THRESHOLD,
+			is_32_bit_app ? "YES" : "NO");
     PIN_InitSymbols();
     xed_tables_init();
     lbr_instance = new LBR(lbr_stack_size);
